@@ -97,6 +97,8 @@ export default function NavigationDrawer({ visible, onClose }: NavigationDrawerP
           <TouchableOpacity
             style={[styles.footerItem, styles.signOut]}
             onPress={() => {
+              // Navigate to the login screen
+              router.push('/(auth)/login');
               // Handle sign out logic here
               onClose();
             }}
