@@ -2,19 +2,21 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
 import { router } from 'expo-router';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const { login } = useAuth();
 
   const handleLogin = () => {
-    // Placeholder for backend authentication logic
-    console.log('Login attempt with:', { email, password });
-    
-    // For demonstration purposes, you could navigate to the tabs
-    // In a real app, you would verify credentials and update authentication state
-    // After successful authentication, the root layout would automatically show tabs
-    router.replace('/(tabs)');
+    // Use the login function from auth context
+    if (email && password) {
+      login(email, password);
+      // No need to navigate manually, the AuthContext will handle this
+    } else {
+      alert('Please enter both email and password');
+    }
   };
 
   return (

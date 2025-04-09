@@ -1,9 +1,11 @@
 import { Redirect } from 'expo-router';
-
-// This is just a placeholder for your authentication logic
-const isAuthenticated = false; // Replace with actual auth state check
+import { View, ActivityIndicator } from 'react-native';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Index() {
+  const { isAuthenticated } = useAuth();
+  
+  // Redirect based on authentication status
   if (isAuthenticated) {
     return <Redirect href="/(tabs)" />;
   } else {

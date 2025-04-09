@@ -1,7 +1,9 @@
+import React from 'react'; // Add this line
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, Switch, Image, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Chrome as Home, Book, Award, GraduationCap, ClipboardList, Building2, Calendar, MessageSquare, Newspaper, CreditCard, PenTool as Tool, Ticket, Search, Settings, LogOut, Moon, X } from 'lucide-react-native';
 import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface NavigationDrawerProps {
   visible: boolean;
@@ -10,6 +12,7 @@ interface NavigationDrawerProps {
 
 export default function NavigationDrawer({ visible, onClose }: NavigationDrawerProps) {
   const router = useRouter();
+  const { logout } = useAuth();
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   const menuItems = [
@@ -59,7 +62,7 @@ export default function NavigationDrawer({ visible, onClose }: NavigationDrawerP
               key={index}
               style={styles.menuItem}
               onPress={() => {
-                router.push(item.route);
+                router.push(item.route as any); //add as nay to remove the red
                 onClose();
               }}
             >
@@ -86,7 +89,7 @@ export default function NavigationDrawer({ visible, onClose }: NavigationDrawerP
           <TouchableOpacity
             style={styles.footerItem}
             onPress={() => {
-              router.push('/settings');
+              router.push('/settings' as any) ;//add as any to remove the red
               onClose();
             }}
           >
@@ -97,9 +100,9 @@ export default function NavigationDrawer({ visible, onClose }: NavigationDrawerP
           <TouchableOpacity
             style={[styles.footerItem, styles.signOut]}
             onPress={() => {
-              // Navigate to the login screen
-              router.push('/(auth)/login');
-              // Handle sign out logic here
+              // Call logout function from AuthContext
+              logout();
+              // No need to manually navigate as AuthContext will handle it
               onClose();
             }}
           >
