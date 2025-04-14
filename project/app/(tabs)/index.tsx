@@ -1,9 +1,18 @@
-import { View, Text, StyleSheet, ScrollView, TextInput, Image, TouchableOpacity } from 'react-native';
-import { Search, Filter, Droplets, Code, Zap, Target, Printer } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-native';
+import { Droplets, Code, Zap, Target, Printer, AlertTriangle } from 'lucide-react-native';
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { useEffect } from 'react';
 import { SplashScreen } from 'expo-router';
 import Header from '@/components/Header';
+
+// Color constants to match Header.js
+const COLORS = {
+  primary: '#1e293b',
+  background: '#ffffff',
+  border: '#e2e8f0',
+  hover: '#f1f5f9',
+  placeholder: '#94a3b8',
+};
 
 SplashScreen.preventAutoHideAsync();
 
@@ -25,42 +34,43 @@ export default function HomeScreen() {
   }
 
   const categories = [
-    { icon: <Droplets size={24} color="#3b82f6" />, title: 'boite eau', count: '42 cours' },
-    { icon: <Code size={24} color="#10b981" />, title: 'pieces plastique', count: '65 cours' },
-    { icon: <Zap size={24} color="#f59e0b" />, title: 'boite gazouz', count: '28 cours' },
-    { icon: <Target size={24} color="#8b5cf6" />, title: 'stylo', count: '36 cours' },
-    { icon: <Printer size={24} color="#ec4899" />, title: 'printer machine', count: '78 cours' },
+    { icon: <Droplets size={24} color="#3b82f6" />, title: 'Injection', count: '12 courses' },
+    { icon: <Code size={24} color="#10b981" />, title: 'Extrusion', count: '8 courses' },
+    { icon: <Zap size={24} color="#f59e0b" />, title: 'Recycling', count: '10 courses' },
+    { icon: <Target size={24} color="#8b5cf6" />, title: 'Materials', count: '15 courses' },
+    { icon: <Printer size={24} color="#ec4899" />, title: 'Quality Control', count: '7 courses' },
+    { icon: <AlertTriangle size={24} color="#f43f5e" />, title: 'Safety', count: '5 courses' },
   ];
 
   const popularCourses = [
     {
       id: 1,
-      title: 'Comment réussir dans le fundraising',
-      instructor: 'Mohammed Murad',
+      title: 'Introduction to Injection Molding',
+      description: 'Learn the fundamentals of injection molding processes for beginners.',
+      level: 'Beginner',
+      duration: '4 weeks',
       rating: 4.8,
-      reviews: 124,
-      duration: '6h 30min',
-      price: '49.99 €',
+      price: '$199',
       image: 'https://images.unsplash.com/photo-1515169067868-5387ec356754?w=800&auto=format&fit=crop&q=60&ixlib=rb-4.0.3'
     },
     {
       id: 2,
-      title: 'Développement Web Fullstack',
-      instructor: 'John Doe',
+      title: 'Advanced Extrusion Techniques',
+      description: 'Master advanced extrusion techniques for various plastics.',
+      level: 'Advanced',
+      duration: '6 weeks',
       rating: 4.6,
-      reviews: 89,
-      duration: '12h 45min',
-      price: '69.99 €',
+      price: '$299',
       image: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&auto=format&fit=crop&q=60&ixlib=rb-4.0.3'
     },
     {
       id: 3,
-      title: 'Marketing Digital pour Débutants',
-      instructor: 'Sarah Johnson',
-      rating: 4.5,
-      reviews: 78,
-      duration: '8h 15min',
-      price: '39.99 €',
+      title: 'Plastics Recycling Fundamentals',
+      description: 'Understand the principles of effective plastics recycling.',
+      level: 'Intermediate',
+      duration: '3 weeks',
+      rating: 4.7,
+      price: '$149',
       image: 'https://images.unsplash.com/photo-1557838923-2985c318be48?w=800&auto=format&fit=crop&q=60&ixlib=rb-4.0.3'
     }
   ];
@@ -68,21 +78,27 @@ export default function HomeScreen() {
   const instructors = [
     {
       id: 1,
-      name: 'John Doe',
-      title: 'Expert en Business',
+      name: 'Dr. Sarah Johnson',
+      title: 'Injection Molding Specialist',
       image: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=800&auto=format&fit=crop&q=60&ixlib=rb-4.0.3'
     },
     {
       id: 2,
-      name: 'John Doe',
-      title: 'Expert en Business',
+      name: 'Prof. Michael Chen',
+      title: 'Polymer Materials Expert',
       image: 'https://images.unsplash.com/photo-1519345182560-3f2917c472ef?w=800&auto=format&fit=crop&q=60&ixlib=rb-4.0.3'
     },
     {
       id: 3,
-      name: 'John Doe',
-      title: 'Expert en Business',
+      name: 'Eng. Robert Williams',
+      title: 'Recycling Processes Consultant',
       image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&auto=format&fit=crop&q=60&ixlib=rb-4.0.3'
+    },
+    {
+      id: 4,
+      name: 'Dr. Emma Garcia',
+      title: 'Quality Control Specialist',
+      image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800&auto=format&fit=crop&q=60&ixlib=rb-4.0.3'
     }
   ];
 
@@ -90,33 +106,30 @@ export default function HomeScreen() {
     <View style={styles.wrapper}>
       <Header />
       <ScrollView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.greeting}>Bonjour,</Text>
-          <Text style={styles.name}>Balti Chef</Text>
+        {/* Welcome Section */}
+        <View style={styles.welcomeSection}>
+          <Text style={styles.welcomeTitle}>Welcome to Plasturgie-Nous Academy</Text>
+          <Text style={styles.welcomeSubtitle}>Your hub for plasturgy training and education</Text>
         </View>
 
-        <View style={styles.searchContainer}>
-          <View style={styles.searchBox}>
-            <Search size={20} color="#666" />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Rechercher des formations..."
-              placeholderTextColor="#666"
-            />
-          </View>
-          <TouchableOpacity style={styles.filterButton}>
-            <Filter size={20} color="#666" />
+        {/* Discover Section */}
+        <View style={styles.discoverSection}>
+          <Text style={styles.discoverTitle}>Discover Plasturgy Excellence</Text>
+          <Text style={styles.discoverText}>Explore our catalog of specialized training programs</Text>
+          <TouchableOpacity style={styles.browseButton}>
+            <Text style={styles.browseButtonText}>Browse Courses</Text>
           </TouchableOpacity>
         </View>
 
+        {/* Categories Section */}
         <View style={styles.categoriesSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Catégories formations</Text>
+            <Text style={styles.sectionTitle}>Training Categories</Text>
             <TouchableOpacity>
-              <Text style={styles.seeAll}>Voir tout</Text>
+              <Text style={styles.seeAll}>View All</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesScroll}>
+          <View style={styles.categoriesGrid}>
             {categories.map((category, index) => (
               <TouchableOpacity key={index} style={styles.categoryCard}>
                 <View style={styles.categoryIcon}>
@@ -126,58 +139,66 @@ export default function HomeScreen() {
                 <Text style={styles.categoryCount}>{category.count}</Text>
               </TouchableOpacity>
             ))}
-          </ScrollView>
+          </View>
         </View>
 
+        {/* Popular Courses Section */}
         <View style={styles.popularSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Formations populaires</Text>
+            <Text style={styles.sectionTitle}>Popular Trainings</Text>
             <TouchableOpacity>
-              <Text style={styles.seeAll}>Voir tout</Text>
+              <Text style={styles.seeAll}>View All</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.coursesScroll}>
+          <View style={styles.coursesGrid}>
             {popularCourses.map((course) => (
               <TouchableOpacity key={course.id} style={styles.courseCard}>
                 <Image source={{ uri: course.image }} style={styles.courseImage} />
                 <View style={styles.courseInfo}>
                   <Text style={styles.courseTitle}>{course.title}</Text>
-                  <Text style={styles.instructorName}>{course.instructor}</Text>
-                  <View style={styles.courseStats}>
-                    <Text style={styles.rating}>★ {course.rating}</Text>
-                    <Text style={styles.reviews}>({course.reviews})</Text>
+                  <Text style={styles.courseDescription}>{course.description}</Text>
+                  <View style={styles.courseDetails}>
+                    <Text style={styles.courseLevel}>{course.level}</Text>
                     <Text style={styles.duration}>{course.duration}</Text>
                   </View>
-                  <Text style={styles.price}>{course.price}</Text>
+                  <View style={styles.courseStats}>
+                    <Text style={styles.price}>{course.price}</Text>
+                    <Text style={styles.rating}>★ {course.rating}</Text>
+                  </View>
+                  <TouchableOpacity style={styles.enrollButton}>
+                    <Text style={styles.enrollButtonText}>Enroll Now</Text>
+                  </TouchableOpacity>
                 </View>
               </TouchableOpacity>
             ))}
-          </ScrollView>
+          </View>
         </View>
 
+        {/* Instructors Section */}
         <View style={styles.instructorsSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Formateurs vedettes</Text>
+            <Text style={styles.sectionTitle}>Featured Trainers</Text>
             <TouchableOpacity>
-              <Text style={styles.seeAll}>Voir tout</Text>
+              <Text style={styles.seeAll}>View All</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.instructorsScroll}>
+          <View style={styles.instructorsGrid}>
             {instructors.map((instructor) => (
               <TouchableOpacity key={instructor.id} style={styles.instructorCard}>
                 <Image source={{ uri: instructor.image }} style={styles.instructorImage} />
                 <Text style={styles.instructorName}>{instructor.name}</Text>
                 <Text style={styles.instructorTitle}>{instructor.title}</Text>
+                <TouchableOpacity style={styles.viewProfileButton}>
+                  <Text style={styles.viewProfileText}>View Profile</Text>
+                </TouchableOpacity>
               </TouchableOpacity>
             ))}
-          </ScrollView>
+          </View>
         </View>
 
-        <View style={styles.aboutSection}>
-          <Text style={styles.aboutTitle}>Qui sommes-nous ?</Text>
-          <Text style={styles.aboutText}>
-            CFI Plasturgie est un centre spécialisé dans la formation en plasturgie et composites. Il accompagne les professionels avec des formations innovantes adaptées aux besoins industriels.
-          </Text>
+        {/* Footer */}
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>© 2025 Plasturgie-Nous Academy. All rights reserved.</Text>
         </View>
       </ScrollView>
     </View>
@@ -187,212 +208,248 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: COLORS.background, // White background
   },
   container: {
     flex: 1,
   },
-  header: {
-    padding: 20,
-  },
-  greeting: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 16,
-    color: '#64748b',
-  },
-  name: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 24,
-    color: '#1e293b',
-    marginTop: 4,
-  },
-  searchContainer: {
-    flexDirection: 'row',
+  welcomeSection: {
     paddingHorizontal: 20,
-    gap: 10,
-    marginBottom: 20,
+    paddingVertical: 16,
   },
-  searchBox: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+  welcomeTitle: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 28,
+    color: COLORS.primary, // Dark blue-gray text
+    marginBottom: 8,
   },
-  searchInput: {
-    flex: 1,
-    marginLeft: 10,
+  welcomeSubtitle: {
     fontFamily: 'Inter-Regular',
     fontSize: 16,
-    color: '#1e293b',
+    color: COLORS.placeholder, // Medium gray text
   },
-  filterButton: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    width: 48,
-    height: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+  discoverSection: {
+    backgroundColor: '#3b82f6', // Keeping the blue background for this section
+    borderRadius: 16,
+    padding: 20,
+    marginHorizontal: 20,
+    marginBottom: 24,
+  },
+  discoverTitle: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 20,
+    color: COLORS.background, // White text
+    marginBottom: 8,
+  },
+  discoverText: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: COLORS.border, // Light gray text
+    marginBottom: 16,
+  },
+  browseButton: {
+    backgroundColor: COLORS.background, // White button
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignSelf: 'flex-start',
+  },
+  browseButtonText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+    color: '#3b82f6', // Blue text
   },
   categoriesSection: {
     marginBottom: 24,
+    paddingHorizontal: 20,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
     marginBottom: 16,
   },
   sectionTitle: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 18,
-    color: '#1e293b',
+    color: COLORS.primary, // Dark blue-gray text
   },
   seeAll: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 14,
-    color: '#2563eb',
+    color: '#3b82f6', // Blue text
   },
-  categoriesScroll: {
-    paddingLeft: 20,
+  categoriesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
   categoryCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    marginRight: 12,
-    width: 120,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  categoryIcon: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: COLORS.background, // White background
     borderRadius: 12,
     padding: 12,
+    width: '30%', // Adjusted for 3 items per row
+    alignItems: 'center',
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border, // Light gray border
+  },
+  categoryIcon: {
+    backgroundColor: COLORS.hover, // Light gray background
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 8,
   },
   categoryTitle: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 14,
-    color: '#1e293b',
+    color: COLORS.primary, // Dark blue-gray text
     textAlign: 'center',
     marginBottom: 4,
   },
   categoryCount: {
     fontFamily: 'Inter-Regular',
     fontSize: 12,
-    color: '#64748b',
+    color: COLORS.placeholder, // Medium gray text
   },
   popularSection: {
     marginBottom: 24,
+    paddingHorizontal: 20,
   },
-  coursesScroll: {
-    paddingLeft: 20,
+  coursesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
   courseCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    marginRight: 16,
-    width: 280,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+    backgroundColor: COLORS.background, // White background
+    borderRadius: 12,
+    width: '100%', // Full width for single column on mobile
+    marginBottom: 16,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.border, // Light gray border
   },
   courseImage: {
     width: '100%',
-    height: 160,
+    height: 120,
   },
   courseInfo: {
-    padding: 16,
+    padding: 12,
   },
   courseTitle: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
-    color: '#1e293b',
+    color: COLORS.primary, // Dark blue-gray text
     marginBottom: 4,
   },
-  instructorName: {
+  courseDescription: {
     fontFamily: 'Inter-Regular',
     fontSize: 14,
-    color: '#64748b',
+    color: COLORS.placeholder, // Medium gray text
     marginBottom: 8,
   },
-  courseStats: {
+  courseDetails: {
     flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 8,
   },
-  rating: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 14,
-    color: '#f59e0b',
-    marginRight: 4,
-  },
-  reviews: {
+  courseLevel: {
     fontFamily: 'Inter-Regular',
     fontSize: 14,
-    color: '#64748b',
-    marginRight: 8,
+    color: COLORS.placeholder, // Medium gray text
   },
   duration: {
     fontFamily: 'Inter-Regular',
     fontSize: 14,
-    color: '#64748b',
+    color: COLORS.placeholder, // Medium gray text
+  },
+  courseStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   price: {
     fontFamily: 'Inter-Bold',
-    fontSize: 18,
-    color: '#2563eb',
+    fontSize: 16,
+    color: COLORS.primary, // Dark blue-gray text
+  },
+  rating: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+    color: '#f59e0b', // Keeping the yellow for ratings
+  },
+  enrollButton: {
+    backgroundColor: '#3b82f6', // Blue button
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  enrollButtonText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+    color: COLORS.background, // White text
   },
   instructorsSection: {
     marginBottom: 24,
+    paddingHorizontal: 20,
   },
-  instructorsScroll: {
-    paddingLeft: 20,
+  instructorsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
   instructorCard: {
+    backgroundColor: COLORS.background, // White background
+    borderRadius: 12,
+    padding: 12,
+    width: '48%', // Adjusted for 2 items per row
     alignItems: 'center',
-    marginRight: 20,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border, // Light gray border
   },
   instructorImage: {
     width: 80,
     height: 80,
     borderRadius: 40,
     marginBottom: 8,
+    backgroundColor: COLORS.hover, // Light gray placeholder
+  },
+  instructorName: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+    color: COLORS.primary, // Dark blue-gray text
+    textAlign: 'center',
+    marginBottom: 4,
   },
   instructorTitle: {
     fontFamily: 'Inter-Regular',
     fontSize: 12,
-    color: '#64748b',
+    color: COLORS.placeholder, // Medium gray text
     textAlign: 'center',
-  },
-  aboutSection: {
-    padding: 20,
-    backgroundColor: '#fff',
-    marginHorizontal: 20,
-    borderRadius: 16,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  aboutTitle: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 18,
-    color: '#1e293b',
     marginBottom: 8,
   },
-  aboutText: {
+  viewProfileButton: {
+    borderWidth: 1,
+    borderColor: '#3b82f6', // Blue border
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  viewProfileText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 12,
+    color: '#3b82f6', // Blue text
+  },
+  footer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  footerText: {
     fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#64748b',
-    lineHeight: 20,
+    fontSize: 12,
+    color: COLORS.placeholder, // Medium gray text
   },
 });

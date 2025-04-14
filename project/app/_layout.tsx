@@ -13,13 +13,15 @@ export default function RootLayout() {
   return (
     <AppSplashScreen>
       <AuthProvider>
-        <Stack screenOptions={{ headerShown: false }}>
+      <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="(pages)" options={{ headerShown: false }} />
           <Stack.Screen name="+not-found" options={{ presentation: 'modal' }} />
         </Stack>
         <StatusBar style="auto" />
       </AuthProvider>
     </AppSplashScreen>
+    
   );
 }

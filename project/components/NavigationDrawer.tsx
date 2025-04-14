@@ -17,18 +17,17 @@ export default function NavigationDrawer({ visible, onClose }: NavigationDrawerP
 
   const menuItems = [
     { icon: <Home size={24} color="#1e293b" />, title: 'Accueil', route: '/' },
-    { icon: <Book size={24} color="#1e293b" />, title: 'Catalogue', route: '/catalogue' },
-    { icon: <Award size={24} color="#1e293b" />, title: 'Certificats', route: '/certificates' },
-    { icon: <GraduationCap size={24} color="#1e293b" />, title: 'Cours', route: '/courses' },
-    { icon: <ClipboardList size={24} color="#1e293b" />, title: 'Inscriptions', route: '/enrollments' },
-    { icon: <Building2 size={24} color="#1e293b" />, title: 'Entreprises', route: '/enterprises' },
-    { icon: <Calendar size={24} color="#1e293b" />, title: 'Événements', route: '/events' },
-    { icon: <MessageSquare size={24} color="#1e293b" />, title: 'Messages', route: '/messages' },
-    { icon: <Newspaper size={24} color="#1e293b" />, title: 'Actualités', route: '/news' },
-    { icon: <CreditCard size={24} color="#1e293b" />, title: 'Paiements', route: '/payments' },
-    { icon: <Tool size={24} color="#1e293b" />, title: 'Sessions Pratiques', route: '/practical-sessions' },
-    { icon: <Ticket size={24} color="#1e293b" />, title: 'Abonnements', route: '/subscriptions' },
-    { icon: <Search size={24} color="#1e293b" />, title: 'Recherche', route: '/search' },
+    { icon: <Award size={24} color="#1e293b" />, title: 'Certificats', route: '/(pages)/certificates' },
+    { icon: <GraduationCap size={24} color="#1e293b" />, title: 'Cours', route: '/(pages)/cours' },
+    { icon: <ClipboardList size={24} color="#1e293b" />, title: 'Inscriptions', route: '/(pages)/enrollments' },
+    { icon: <Building2 size={24} color="#1e293b" />, title: 'Entreprises', route: '/(pages)/enterprises' },
+    { icon: <Calendar size={24} color="#1e293b" />, title: 'Événements', route: '/(pages)/event' },
+    { icon: <MessageSquare size={24} color="#1e293b" />, title: 'Messages', route: '/(tabs)/messages' },
+    { icon: <Newspaper size={24} color="#1e293b" />, title: 'Actualités', route: '/(pages)/news' },
+    { icon: <CreditCard size={24} color="#1e293b" />, title: 'Paiements', route: '/(pages)/payments' },
+    { icon: <Tool size={24} color="#1e293b" />, title: 'Sessions Pratiques', route: '/(pages)/practicalSessions' },
+    { icon: <Ticket size={24} color="#1e293b" />, title: 'Abonnements', route: '/(pages)/subscriptions' },
+    { icon: <Search size={24} color="#1e293b" />, title: 'Recherche', route: '/(tabs)' },
   ];
 
   return (
@@ -62,7 +61,7 @@ export default function NavigationDrawer({ visible, onClose }: NavigationDrawerP
               key={index}
               style={styles.menuItem}
               onPress={() => {
-                router.push(item.route as any); //add as nay to remove the red
+                router.push(item.route as any);
                 onClose();
               }}
             >

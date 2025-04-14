@@ -21,13 +21,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="catalogue"
-        options={{
-          title: 'Catalogue',
-          tabBarIcon: ({ color, size }) => <Book size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
         name="formateurs"
         options={{
           title: 'Formateurs',
@@ -45,6 +38,13 @@ export default function TabLayout() {
         name="profile"
         options={{
           href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="certificates"
+        options={{
+          title: 'Certificats',
+          tabBarIcon: ({ color, size }) => <Users size={size} color={color} />,
         }}
       />
     </Tabs>
