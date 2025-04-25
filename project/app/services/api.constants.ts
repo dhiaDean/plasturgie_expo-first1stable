@@ -6,7 +6,7 @@ import Constants from 'expo-constants';
 const API_BASE_URL_FROM_CONFIG = Constants.expoConfig?.extra?.apiBaseUrl;
 
 // Fallback if not defined in config (REPLACE with your actual local IP for testing)
-const FALLBACK_API_URL = 'http://192.168.1.100:5000/api'; // <-- !! REPLACE with your correct local IP:PORT/api base !!
+const FALLBACK_API_URL = 'http://192.168.1.14:5000/api'; // <-- !! REPLACE with your correct local IP:PORT/api base !!
 
 // Use the config URL if available, otherwise fall back
 export const API_BASE_URL = API_BASE_URL_FROM_CONFIG || FALLBACK_API_URL;
@@ -60,7 +60,7 @@ export const API_ENDPOINTS = {
   // --- Enrollments ---
   ENROLLMENTS: {
     // Endpoint to get enrollments for the current logged-in user
-    ME: `${API_BASE_URL}/enrollments/me`
+    ME: `${API_BASE_URL}/enrollments/user`
     // Add other enrollment endpoints if needed (e.g., create, get by ID)
     // CREATE: `${API_BASE_URL}/enrollments`,
     // BY_ID: (enrollmentId: number | string) => `${API_BASE_URL}/enrollments/${enrollmentId}`
@@ -68,7 +68,7 @@ export const API_ENDPOINTS = {
   // --- Certifications ---
   CERTIFICATIONS: {
     // Endpoint to get certifications for the current logged-in user
-    ME: `${API_BASE_URL}/certifications/me`
+    ME: `${API_BASE_URL}/certifications/my-certifications`
     // Add other certification endpoints if needed
     // BY_ID: (certificationId: number | string) => `${API_BASE_URL}/certifications/${certificationId}`
   },

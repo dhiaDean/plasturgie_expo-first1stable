@@ -147,14 +147,14 @@ export default function ProfileScreen() {
         </View>
     );
 
-    /*const renderCertificateItem = (item: Certification) => (
+    const renderCertificateItem = (item: Certification) => (
          <View key={`cert-${item.id ?? item.certificationId}`} style={styles.listItem}>
             <Text style={styles.listItemTitle}>{courses[item.courseId]?.title ?? `Course ID: ${item.courseId}`}</Text>
             <Text style={styles.listItemSubtitle}>Issued: {formatDateSimple(item.issueDate ?? item.certificationDate)} - Status: {item.status}</Text>
              
              
         </View>
-    );*/
+    );
 
     return (
         <SafeAreaView style={styles.safeArea}>

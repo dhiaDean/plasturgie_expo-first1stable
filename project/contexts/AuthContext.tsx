@@ -1,14 +1,20 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // Adjust path based on your project structure
-import { apiService } from '../app/services/api.service';
-import { AuthResponse, RegisterRequest, User, ApiError, AuthRequest } from '../app/services/api.types';
+import { apiService } from '@/app/services/api.service'; // Assuming services is at root/app/services
+import {
+    AuthRequest,
+    AuthResponse,
+    RegisterRequest,
+    User,
+    ApiError // Keep ApiError if used
+} from '@/app/services/api.types'; // Assuming services is at root/app/services
 
 interface AuthContextType {
   user: User | null;
-  token: string | null; // Expose token if needed elsewhere, though maybe not necessary
+  token: string | null;
   login: (response: AuthResponse) => Promise<void>; // Login function takes the response directly
-  performLogin: (credentials: AuthRequest) => Promise<void>; // New function to perform login API call
+  performLogin: (credentials: AuthRequest) => Promise<void>; // Function to perform login API call
   register: (registerData: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>; // Make logout async
   isLoading: boolean; // Indicates auth state is being checked/updated
@@ -18,13 +24,26 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const USER_STORAGE_KEY = 'user';
-const TOKEN_STORAGE_KEY = 'token';
+const USER_STORAGE_KEY = 'user_data_key'; // Use distinct keys
+const TOKEN_STORAGE_KEY = 'auth_token_key'; // Use distinct keys
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true); // Start loading until auth is checked
+
+  // --- Clear Auth Data Helper ---
+  const clearAuthData = useCallback(async () => {
+      console.log('Clearing auth data from storage and state.');
+      try {
+          await AsyncStorage.multiRemove([TOKEN_STORAGE_KEY, USER_STORAGE_KEY]);
+          apiService.setToken(null); // Use null for clarity
+          setToken(null);
+          setUser(null);
+      } catch (e) {
+          console.error("Failed to clear auth data:", e);
+      }
+  }, []); // No dependencies
 
   // --- Load Initial State ---
   useEffect(() => {
@@ -37,45 +56,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (storedToken) {
           console.log('Found token in storage.');
-          apiService.setToken(storedToken); // Set token in API service
+          apiService.setToken(storedToken);
           setToken(storedToken);
 
-          // Option 1: Trust stored user data initially (faster load)
           if (storedUserString) {
             try {
               const storedUser = JSON.parse(storedUserString);
               setUser(storedUser);
               console.log('Loaded user from storage:', storedUser.username);
+              // Optionally trigger a background refresh on load if desired
+              // refreshUserData(); // Be careful not to cause infinite loops
             } catch (e) {
-              console.error("Failed to parse stored user data", e);
-              // Clear invalid stored user data
-              await AsyncStorage.removeItem(USER_STORAGE_KEY);
+              console.error("Failed to parse stored user data, clearing auth.", e);
+              await clearAuthData(); // Clear invalid data
             }
+          } else {
+               // Has token but no user data? Try to refresh.
+               console.log("Token found but no user data, attempting refresh...");
+               await refreshUserData(storedToken); // Pass token directly if state not set yet
           }
-          // Option 2: Always verify token with API (more secure, slightly slower load)
-          // Comment out Option 1's user loading if using this
-          // try {
-          //    console.log('Verifying token with API...');
-          //    const freshUserData = await apiService.getCurrentUser();
-          //    setUser(freshUserData);
-          //    await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(freshUserData));
-          //    console.log('User data refreshed from API:', freshUserData.username);
-          // } catch (verifyError: any) {
-          //    console.error('Token verification failed:', verifyError.message);
-          //    // If token is invalid (e.g., 401), clear everything
-          //    if (verifyError.response?.status === 401) {
-          //        await clearAuthData();
-          //    }
-          // }
 
         } else {
           console.log('No token found in storage.');
           apiService.clearToken(); // Ensure service token is null
+          setUser(null); // Ensure user is null if no token
         }
       } catch (error) {
         console.error('Error during auth initialization:', error);
-        // Consider clearing storage on generic errors too?
-        // await clearAuthData();
+        await clearAuthData(); // Clear auth on significant errors
       } finally {
         setIsLoading(false);
         console.log('Auth initialization finished.');
@@ -83,18 +91,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     initializeAuth();
-  }, []); // Run only once on mount
-
-
-  // --- Clear Auth Data Helper ---
-   const clearAuthData = async () => {
-        console.log('Clearing auth data from storage and state.');
-        await AsyncStorage.removeItem(TOKEN_STORAGE_KEY);
-        await AsyncStorage.removeItem(USER_STORAGE_KEY);
-        apiService.clearToken();
-        setToken(null);
-        setUser(null);
-   };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount - disabled exhaustive-deps for initializeAuth
 
   // --- Login ---
   // Takes AuthResponse after successful API call
@@ -102,25 +100,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('Handling login response...');
     setIsLoading(true); // Indicate state update is happening
     try {
-      if (!response || !response.access_token || !response.user_id) {
-        throw new Error('Invalid authentication response received');
+      // *** USE MODIFIED FIELD NAMES FOR CHECKING AND DESTRUCTURING ***
+      if (!response || !response.access_token || !response.user_id) { // <-- Check for access_token and user_id
+        throw new Error('Invalid authentication response received (Missing access_token or user_id)');
       }
 
       const {
-        access_token: receivedToken, // <-- Destructure access_token as receivedToken
-        user_id: receivedUserId,     // <-- Destructure user_id as receivedUserId
-        username,
-        email,
-        role
-    } = response;
-      const userData: User = { id: receivedUserId, username, email, role };
+          access_token: receivedToken, // <-- Destructure access_token as receivedToken
+          user_id: receivedUserId,     // <-- Destructure user_id as receivedUserId
+          username,
+          email,
+          role
+      } = response;
+      // *** END OF MODIFICATIONS ***
 
-      await AsyncStorage.setItem(TOKEN_STORAGE_KEY, receivedToken);
-      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userData));
+      // Construct the User object for state/storage (using 'id' as the key internally)
+      const userData: User = {
+          id: receivedUserId, // <-- Use receivedUserId here
+          username,
+          email,
+          role
+      };
 
-      apiService.setToken(receivedToken);
-      setToken(receivedToken);
-      setUser(userData);
+      await AsyncStorage.setItem(TOKEN_STORAGE_KEY, receivedToken); // Store the token
+      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userData)); // Store the user data
+
+      apiService.setToken(receivedToken); // Set token in service
+      setToken(receivedToken); // Set token in state
+      setUser(userData); // Set user in state
       console.log('User logged in:', userData.username);
     } catch (error) {
       console.error('Failed to process login response:', error);
@@ -129,48 +136,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
         setIsLoading(false);
     }
-  }, []);
+  }, [clearAuthData]); // Depends on clearAuthData
 
   // --- Perform Login API Call ---
-  // Separated function to call the API, then calls login() on success
   const performLogin = useCallback(async (credentials: AuthRequest): Promise<void> => {
     console.log('Performing login API call...');
     setIsLoading(true);
     try {
         const response = await apiService.login(credentials);
-        await login(response); // Handle the successful response
+        await login(response); // Handle the successful response using the login callback
     } catch (error) {
         console.error('API login request failed:', error);
-        // Optionally handle specific error messages for UI feedback
         await clearAuthData(); // Ensure cleanup on failure
         throw error; // Re-throw for the UI layer
     } finally {
         setIsLoading(false);
     }
-  }, [login]); // Depends on the memoized login function
-
+  }, [login, clearAuthData]); // Depends on login and clearAuthData callbacks
 
   // --- Register ---
   const register = useCallback(async (registerData: RegisterRequest): Promise<void> => {
     console.log('Performing register API call...');
     setIsLoading(true);
     try {
-      // API call doesn't return user/token, user needs to login after register
       await apiService.register(registerData);
       console.log('Registration successful via API.');
-      // Optionally show a success message or navigate to login
     } catch (error) {
       console.error('Registration API request failed:', error);
-      throw error; // Re-throw for the UI layer
+      throw error;
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, []); // No dependencies
 
   // --- Logout ---
   const logout = useCallback(async (): Promise<void> => {
     console.log('Performing logout...');
-    setIsLoading(true);
+    setIsLoading(true); // Optional: show loading during logout
     try {
         // Attempt server logout first, but proceed regardless
         await apiService.logout(); // apiService.logout already clears its internal token
@@ -178,56 +180,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
          console.warn('Server logout failed, proceeding with client-side logout:', error);
     } finally {
         await clearAuthData(); // Clear local storage and state
-        setIsLoading(false);
+        setIsLoading(false); // Set loading false after clearing
         console.log('User logged out.');
-        // Navigate to login screen (handle this in your navigation setup)
+        // Navigation is handled by RootLayoutNav effect
     }
-  }, []);
+  }, [clearAuthData]); // Depends on clearAuthData
 
   // --- Refresh User Data ---
-   const refreshUserData = useCallback(async (): Promise<void> => {
+   const refreshUserData = useCallback(async (currentToken?: string | null): Promise<void> => {
+    const tokenToUse = currentToken ?? token; // Use passed token or state token
     console.log('Attempting to refresh user data...');
-     if (!token) {
+     if (!tokenToUse) {
        console.log('No token available, cannot refresh.');
-       // Optionally clear user state if token is missing but user exists?
-       // if (user) setUser(null);
+       // If user exists without token, clear user state for consistency
+       if (user) setUser(null);
        return;
      }
+     // Avoid concurrent refreshes if already loading
+     if (isLoading && !currentToken) return;
+
      setIsLoading(true); // Indicate refresh is happening
      try {
-       apiService.setToken(token); // Ensure API service has the current token
+       apiService.setToken(tokenToUse); // Ensure API service has the current token
        const freshUserData = await apiService.getCurrentUser();
        setUser(freshUserData);
        await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(freshUserData));
        console.log('User data refreshed:', freshUserData.username);
      } catch (error: any) {
        console.error('Failed to refresh user data:', error);
-       // If token is invalid (401), log out the user
        if (error.response?.status === 401) {
          console.warn('Token expired or invalid during refresh, logging out.');
          await logout(); // Use the async logout function
        }
-       // Do not throw error here usually, as it might disrupt background refreshes
      } finally {
        setIsLoading(false);
      }
-   }, [token, logout]); // Depend on token and logout
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [token, user, logout, isLoading]); // Depend on token, user, logout, isLoading
 
-
-  return (
-    <AuthContext.Provider
-      value={{
+  // --- Context Value ---
+  const authContextValue = useMemo(() => ({
         user,
-        token, // Expose token
-        login, // Use this after getting response from API
-        performLogin, // Use this from login screen UI
+        token,
+        login,
+        performLogin,
         register,
         logout,
         isLoading,
         isAuthenticated: !!user && !!token, // Base authentication on having both user and token
         refreshUserData,
-      }}
-    >
+  }), [user, token, login, performLogin, register, logout, isLoading, refreshUserData]);
+
+
+  return (
+    <AuthContext.Provider value={authContextValue}>
       {children}
     </AuthContext.Provider>
   );

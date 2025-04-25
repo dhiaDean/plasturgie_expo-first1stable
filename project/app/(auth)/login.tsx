@@ -7,12 +7,12 @@ import {
     TouchableOpacity,
     StyleSheet,
     SafeAreaView,
-    Alert, // Import Alert for error messages
-    ActivityIndicator, // Import ActivityIndicator for loading state
+    Alert,
+    ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import { AuthRequest } from '@/app/services/api.types'; // Import the type
+import { AuthRequest } from '../services/api.types'; // Adjust path if needed
 
 // Reusing theme colors (adapt if needed)
 const styles = StyleSheet.create({
@@ -32,6 +32,13 @@ const styles = StyleSheet.create({
         marginBottom: 32, // Increased margin
         textAlign: 'center',
     },
+    // Style for error message shown above the form
+    formErrorText: {
+        color: '#dc2626', // Red
+        fontSize: 14,
+        textAlign: 'center',
+        marginBottom: 16, // Space below error message
+    },
     inputContainer: {
         marginBottom: 20, // Increased margin
     },
@@ -50,6 +57,9 @@ const styles = StyleSheet.create({
         borderColor: '#cbd5e1', // Lighter border
         fontSize: 16, // Ensure font size is appropriate
         color: '#1e293b',
+    },
+    inputError: { // Style to apply to input on error (optional)
+        borderColor: '#dc2626', // Red border
     },
     button: {
         backgroundColor: '#2563eb', // Accent blue
@@ -80,34 +90,28 @@ const styles = StyleSheet.create({
         fontSize: 14,
         marginVertical: 8,
     },
-    errorText: { // Style for error messages below fields (optional)
-        color: '#dc2626', // Red
-        fontSize: 12,
-        marginTop: 4,
-    }
 });
 
 
 export default function LoginScreen() {
-  // Assuming login uses 'username', but email might also work depending on backend
   const [usernameOrEmail, setUsernameOrEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [localError, setLocalError] = useState<string | null>(null); // For displaying API errors
+  // State specifically for displaying login error messages near the form
+  const [loginError, setLoginError] = useState<string | null>(null);
 
-  // Get functions and state from AuthContext
   const { performLogin, isLoading } = useAuth();
 
   const handleLogin = async () => {
-    setLocalError(null); // Clear previous errors
+    setLoginError(null); // Clear previous form errors on new attempt
 
-    // Basic frontend validation
     if (!usernameOrEmail || !password) {
-      Alert.alert('Error', 'Please enter both username/email and password');
+      // Keep using Alert for simple missing field validation
+      Alert.alert('Input Required', 'Please enter both username/email and password.');
       return;
     }
 
     const credentials: AuthRequest = {
-      username: usernameOrEmail, // Use the state variable here
+      username: usernameOrEmail,
       password: password,
     };
 
@@ -115,15 +119,27 @@ export default function LoginScreen() {
         console.log('Attempting login with:', credentials.username);
         await performLogin(credentials);
         console.log('Login successful, navigating...');
-        // Navigate to the main part of the app after successful login
-        // Replace '/(tabs)/' with your actual main app route group or initial screen
-        router.replace('/(tabs)');
+        // Navigate after successful login (handled by performLogin -> login -> RootLayoutNav effect)
+        // No explicit navigation needed here if RootLayoutNav handles it
+        // router.replace('/(tabs)');
     } catch (error: any) {
       console.error('Login failed:', error);
-      // Extract message from the error structure provided by api.service
-      const message = error?.response?.data?.message || error?.message || 'Login failed. Please check your credentials.';
-      setLocalError(message); // Set local state to display error near form
-      Alert.alert('Login Failed', message); // Also show a popup alert
+      let message = 'Login failed. Please try again later.'; // Default generic error
+
+      // Check if it's a specific 'Unauthorized' error (wrong credentials)
+      if (error?.response?.status === 401) {
+        message = 'Incorrect username or password.'; // Specific message for bad credentials
+        // Set the specific error message to display near the form
+        setLoginError(message);
+        // Optionally, don't show an Alert for this common case, the inline message is enough
+      } else {
+        // For other errors (network, server error, etc.), extract message or use default
+        message = error?.response?.data?.message || error?.message || message;
+        // Show a popup Alert for unexpected errors
+        Alert.alert('Login Failed', message);
+        // Optionally also set the localError state if you want to display these too
+        // setLoginError(message);
+      }
     }
   };
 
@@ -132,43 +148,49 @@ export default function LoginScreen() {
       <View style={styles.formContainer}>
         <Text style={styles.title}>Login</Text>
 
-        {/* Optional: Display API error message near the top */}
-        {/* {localError && <Text style={styles.errorText}>{localError}</Text>} */}
+        {/* Display login error message right below the title */}
+        {loginError && (
+          <Text style={styles.formErrorText}>{loginError}</Text>
+        )}
 
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Username or Email</Text>
           <TextInput
-            style={styles.input}
+            // Apply error style to input border if loginError exists (optional)
+            style={[styles.input, loginError ? styles.inputError : null]}
             placeholder="Enter username or email"
             value={usernameOrEmail}
-            onChangeText={setUsernameOrEmail}
-            keyboardType="email-address" // Keeps common keyboard type
+            // Clear error when user starts typing again
+            onChangeText={(text) => { setUsernameOrEmail(text); setLoginError(null); }}
+            keyboardType="email-address"
             autoCapitalize="none"
-            autoComplete="username" // Help password managers
-            editable={!isLoading} // Disable input while loading
+            autoComplete="username"
+            editable={!isLoading}
           />
         </View>
 
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Password</Text>
           <TextInput
-            style={styles.input}
+            // Apply error style to input border if loginError exists (optional)
+            style={[styles.input, loginError ? styles.inputError : null]}
             placeholder="Enter your password"
             value={password}
-            onChangeText={setPassword}
+             // Clear error when user starts typing again
+            onChangeText={(text) => { setPassword(text); setLoginError(null); }}
             secureTextEntry
-            autoComplete="current-password" // Help password managers
-            editable={!isLoading} // Disable input while loading
+            autoComplete="current-password"
+            editable={!isLoading}
           />
         </View>
 
         <TouchableOpacity
-          style={[styles.button, isLoading && styles.buttonDisabled]} // Apply disabled style
+          style={[styles.button, isLoading && styles.buttonDisabled]}
           onPress={handleLogin}
-          disabled={isLoading} // Disable button while loading
+          disabled={isLoading}
         >
           <Text style={styles.buttonText}>Login</Text>
-          {isLoading && ( // Show loading indicator next to text
+          {isLoading && (
             <ActivityIndicator size="small" color="#ffffff" style={styles.loadingIndicator} />
           )}
         </TouchableOpacity>
