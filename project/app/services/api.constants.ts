@@ -6,7 +6,7 @@ import Constants from 'expo-constants';
 const API_BASE_URL_FROM_CONFIG = Constants.expoConfig?.extra?.apiBaseUrl;
 
 // Fallback if not defined in config (REPLACE with your actual local IP for testing)
-const FALLBACK_API_URL = 'http://192.168.1.14:5000/api'; // <-- !! REPLACE with your correct local IP:PORT/api base !!
+const FALLBACK_API_URL = 'http://192.168.1.15:5000/api'; // <-- !! REPLACE with your correct local IP:PORT/api base !!
 
 // Use the config URL if available, otherwise fall back
 export const API_BASE_URL = API_BASE_URL_FROM_CONFIG || FALLBACK_API_URL;

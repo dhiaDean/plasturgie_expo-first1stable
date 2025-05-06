@@ -43,6 +43,7 @@ const formatDateSimple = (dateString: string | undefined): string => {
 // --- Main Component ---
 export default function ProfileScreen() {
     const { user, logout, isAuthenticated } = useAuth(); // Get user, logout, and auth status
+    console.log('ProfileScreen: Rendering with user:', JSON.stringify(user))
 
     // --- State for fetched data ---
     const [enrollments, setEnrollments] = useState<Enrollment[]>([]);

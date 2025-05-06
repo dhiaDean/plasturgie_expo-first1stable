@@ -61,8 +61,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           if (storedUserString) {
             try {
-              const storedUser = JSON.parse(storedUserString);
+        const storedUser = JSON.parse(storedUserString);
               setUser(storedUser);
+              console.log('AuthContext initializeAuth: user loaded from storage:', JSON.stringify(storedUser));
               console.log('Loaded user from storage:', storedUser.username);
               // Optionally trigger a background refresh on load if desired
               // refreshUserData(); // Be careful not to cause infinite loops
@@ -121,6 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email,
           role
       };
+      console.log('AuthContext login: userData being set:', JSON.stringify(userData));
 
       await AsyncStorage.setItem(TOKEN_STORAGE_KEY, receivedToken); // Store the token
       await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userData)); // Store the user data
@@ -205,6 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
        const freshUserData = await apiService.getCurrentUser();
        setUser(freshUserData);
        await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(freshUserData));
+       console.log('AuthContext refreshUserData: fresh data from API:', JSON.stringify(freshUserData));
        console.log('User data refreshed:', freshUserData.username);
      } catch (error: any) {
        console.error('Failed to refresh user data:', error);
