@@ -28,10 +28,11 @@ export interface RegisterRequest {
 export interface User {
   id: number; // Internal representation in frontend state/storage still uses 'id'
   username: string;
-  firstName?: string; 
+  firstName?: string;
   lastName?: string;
   email: string;
   role: Role;
+  avatarUrl?: string;
 }
 
 export type Role = 'ROLE_LEARNER' | 'ROLE_INSTRUCTOR' | 'ROLE_ADMIN' | 'ROLE_COMPANY_REP';

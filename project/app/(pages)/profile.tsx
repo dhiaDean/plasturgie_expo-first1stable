@@ -17,20 +17,33 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { apiService } from '../services/api.service';
 import { Enrollment, Certification, Course, UserProfileUpdate } from '../services/api.types';
-import { FontAwesome, Feather } from '@expo/vector-icons';
+import { FontAwesome, Feather, MaterialIcons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 
 // --- Helper Functions ---
-const renderAvatar = (name: string | undefined, size: number = styles.avatar.width) => {
+const renderAvatar = (name: string | undefined, avatarUrl: string | null, size: number = styles.avatar.width, onPress?: () => void) => {
     const initial = name ? name.charAt(0).toUpperCase() : '?';
-    const avatarUrl = null;
-    if (avatarUrl) {
-        return <Image source={{ uri: avatarUrl }} style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]} />;
-    }
-    return (
+    
+    const content = avatarUrl ? (
+        <Image source={{ uri: avatarUrl }} style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]} />
+    ) : (
         <View style={[styles.avatarPlaceholder, { width: size, height: size, borderRadius: size / 2 }]}>
             <FontAwesome name="user-circle" size={size * 0.6} color="#94a3b8" />
         </View>
     );
+    
+    if (onPress) {
+        return (
+            <TouchableOpacity onPress={onPress} style={styles.avatarContainer}>
+                {content}
+                <View style={styles.editAvatarOverlay}>
+                    <Feather name="camera" size={24} color="#ffffff" />
+                </View>
+            </TouchableOpacity>
+        );
+    }
+    
+    return content;
 };
 
 const formatDateSimple = (dateString: string | undefined): string => {
@@ -67,14 +80,160 @@ export default function ProfileScreen() {
     const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
     const [editFormErrors, setEditFormErrors] = useState<Partial<UserProfileUpdate & { form?: string, confirmPassword?: string }>>({});
 
+    // --- State for Avatar/Photo ---
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+    const [isImageModalVisible, setIsImageModalVisible] = useState(false);
+    const [isUploadingImage, setIsUploadingImage] = useState(false);
+
     // --- Populate form fields when user data is available or modal opens ---
     useEffect(() => {
         if (user) {
             setEditFirstName(user.firstName || '');
             setEditLastName(user.lastName || '');
             setEditEmail(user.email || '');
+            // If user has avatar url, set it
+            if (user.avatarUrl) {
+                setAvatarUrl(user.avatarUrl);
+            }
         }
     }, [user, isEditModalVisible]);
+
+    // --- Avatar/Image Functions ---
+    const handleAvatarPress = () => {
+        setIsImageModalVisible(true);
+    };
+
+    const requestPermission = async () => {
+        if (Platform.OS !== 'web') {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permission Denied', 'Sorry, we need camera roll permissions to make this work!');
+                return false;
+            }
+            return true;
+        }
+        return true;
+    };
+
+    const takePhoto = async () => {
+        const hasPermission = await requestPermission();
+        if (!hasPermission) return;
+
+        try {
+            const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.7,
+            });
+
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                uploadImage(result.assets[0].uri);
+            }
+        } catch (error) {
+            console.error('Error taking photo:', error);
+            Alert.alert('Error', 'Failed to take photo');
+        } finally {
+            setIsImageModalVisible(false);
+        }
+    };
+
+    const pickImage = async () => {
+        const hasPermission = await requestPermission();
+        if (!hasPermission) return;
+
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.7,
+            });
+
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                uploadImage(result.assets[0].uri);
+            }
+        } catch (error) {
+            console.error('Error picking image:', error);
+            Alert.alert('Error', 'Failed to pick image');
+        } finally {
+            setIsImageModalVisible(false);
+        }
+    };
+
+    const uploadImage = async (uri: string) => {
+        if (!user?.id) {
+            Alert.alert('Error', 'User information not available');
+            return;
+        }
+
+        setIsUploadingImage(true);
+        try {
+            // Create FormData for the image upload
+            const formData = new FormData();
+            formData.append('file', {
+                uri,
+                name: 'profile-image.jpg',
+                type: 'image/jpeg',
+            } as any);
+
+            // Call API to upload the image
+            console.log('Uploading avatar image...');
+            // TODO: Replace with actual API call for avatar upload
+            // const response = await apiService.uploadUserAvatar(user.id, formData);
+            
+            // Simulate a successful upload
+            // For actual implementation, use the URL returned from your API
+            setTimeout(() => {
+                // Simulate a URL from your backend
+                const newAvatarUrl = uri; // In actual implementation, this would be the URL from your server
+                setAvatarUrl(newAvatarUrl);
+                
+                // Update user context if needed
+                refreshUserData();
+                
+                Alert.alert('Success', 'Profile picture updated successfully!');
+                setIsUploadingImage(false);
+            }, 1500);
+            
+        } catch (error) {
+            console.error('Error uploading image:', error);
+            Alert.alert('Upload Failed', 'Could not upload image. Please try again.');
+            setIsUploadingImage(false);
+        }
+    };
+
+    const removeAvatar = async () => {
+        if (!user?.id) {
+            Alert.alert('Error', 'User information not available');
+            return;
+        }
+
+        setIsUploadingImage(true);
+        try {
+            // Call API to remove the avatar
+            console.log('Removing avatar image...');
+            // TODO: Replace with actual API call
+            // await apiService.removeUserAvatar(user.id);
+            
+            // Simulate a successful removal
+            setTimeout(() => {
+                setAvatarUrl(null);
+                
+                // Update user context if needed
+                refreshUserData();
+                
+                Alert.alert('Success', 'Profile picture removed successfully!');
+                setIsUploadingImage(false);
+                setIsImageModalVisible(false);
+            }, 1000);
+            
+        } catch (error) {
+            console.error('Error removing avatar:', error);
+            Alert.alert('Failed', 'Could not remove profile picture. Please try again.');
+            setIsUploadingImage(false);
+        }
+    };
 
     // --- Data Fetching Logic --- (RESTORED FROM OLD FILE)
     const fetchData = useCallback(async () => {
@@ -240,7 +399,13 @@ export default function ProfileScreen() {
             >
                 {/* Header Section */}
                 <View style={styles.header}>
-                    {renderAvatar(user?.username)}
+                    {isUploadingImage ? (
+                        <View style={styles.loadingAvatarContainer}>
+                            <ActivityIndicator size="large" color="#4f46e5" />
+                        </View>
+                    ) : (
+                        renderAvatar(user?.username, avatarUrl, styles.avatar.width, handleAvatarPress)
+                    )}
                     <Text style={styles.name}>{user?.username ?? 'Loading...'}</Text>
                     <Text style={styles.email}>{user?.email ?? 'Loading...'}</Text>
                     {user?.role && (
@@ -398,6 +563,47 @@ export default function ProfileScreen() {
                     </View>
                 </View>
             </Modal>
+
+            {/* Image Selection Modal */}
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={isImageModalVisible}
+                onRequestClose={() => {
+                    if (!isUploadingImage) setIsImageModalVisible(false);
+                }}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.imageModalContent}>
+                        <Text style={styles.modalTitle}>Change Profile Picture</Text>
+                        
+                        <TouchableOpacity style={styles.imageOptionButton} onPress={takePhoto} disabled={isUploadingImage}>
+                            <MaterialIcons name="photo-camera" size={24} color="#3730a3" />
+                            <Text style={styles.imageOptionText}>Take a Photo</Text>
+                        </TouchableOpacity>
+                        
+                        <TouchableOpacity style={styles.imageOptionButton} onPress={pickImage} disabled={isUploadingImage}>
+                            <MaterialIcons name="photo-library" size={24} color="#3730a3" />
+                            <Text style={styles.imageOptionText}>Choose from Gallery</Text>
+                        </TouchableOpacity>
+                        
+                        {avatarUrl && (
+                            <TouchableOpacity style={styles.imageOptionButton} onPress={removeAvatar} disabled={isUploadingImage}>
+                                <MaterialIcons name="delete" size={24} color="#dc2626" />
+                                <Text style={styles.imageOptionTextDanger}>Remove Current Photo</Text>
+                            </TouchableOpacity>
+                        )}
+                        
+                        <TouchableOpacity 
+                            style={styles.cancelImageButton}
+                            onPress={() => setIsImageModalVisible(false)}
+                            disabled={isUploadingImage}
+                        >
+                            <Text style={styles.cancelImageButtonText}>Cancel</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -426,11 +632,36 @@ const styles = StyleSheet.create({
         marginBottom: 16,
         backgroundColor: '#e2e8f0',
     },
-    avatarPlaceholder: {
+    avatarContainer: {
+        position: 'relative',
+        marginBottom: 0,
+    },
+    loadingAvatarContainer: {
         width: 100,
         height: 100,
         borderRadius: 50,
         marginBottom: 16,
+        backgroundColor: '#e2e8f0',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    editAvatarOverlay: {
+        position: 'absolute',
+        bottom: 15,
+        right: 0,
+        backgroundColor: 'rgba(37, 99, 235, 0.8)',
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#ffffff',
+    },
+    avatarPlaceholder: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
         backgroundColor: '#e2e8f0',
         alignItems: 'center',
         justifyContent: 'center',
@@ -546,6 +777,13 @@ const styles = StyleSheet.create({
         padding: 20,
         maxHeight: '85%',
     },
+    imageModalContent: {
+        width: '80%',
+        backgroundColor: '#ffffff',
+        borderRadius: 12,
+        padding: 20,
+        alignItems: 'center',
+    },
     modalTitle: {
         fontSize: 20,
         fontWeight: '600',
@@ -627,6 +865,47 @@ const styles = StyleSheet.create({
     },
     modalSubmitButtonText: {
         color: '#ffffff',
+        fontWeight: '500',
+    },
+    
+    // Image Option Styles
+    imageOptionButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        backgroundColor: '#f1f5f9',
+        borderRadius: 8,
+        marginVertical: 8,
+        width: '100%',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+    },
+    imageOptionText: {
+        marginLeft: 16,
+        fontSize: 16,
+        color: '#1e293b',
+        fontWeight: '500',
+    },
+    imageOptionTextDanger: {
+        marginLeft: 16,
+        fontSize: 16,
+        color: '#dc2626',
+        fontWeight: '500',
+    },
+    cancelImageButton: {
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        marginTop: 16,
+        backgroundColor: '#e2e8f0',
+        width: '100%',
+        alignItems: 'center',
+    },
+    cancelImageButtonText: {
+        color: '#64748b',
+        fontSize: 16,
         fontWeight: '500',
     },
     iconColor: { color: '#64748b' },
