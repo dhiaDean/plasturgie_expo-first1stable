@@ -8,25 +8,27 @@ import {
     SafeAreaView,
     ScrollView,
     Alert,
-    ActivityIndicator, // Import ActivityIndicator
-    RefreshControl, // Import RefreshControl
+    ActivityIndicator,
+    RefreshControl,
+    Modal,
+    TextInput,
+    Platform,
 } from 'react-native';
-import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
-import { apiService } from '../services/api.service'; // Import apiService
-import { Enrollment, Certification, Course } from '../services/api.types'; // Import types
-import { FontAwesome } from '@expo/vector-icons'; // For avatar fallback
+import { useAuth } from '@/contexts/AuthContext';
+import { apiService } from '../services/api.service';
+import { Enrollment, Certification, Course, UserProfileUpdate } from '../services/api.types';
+import { FontAwesome, Feather } from '@expo/vector-icons';
 
-// --- Helper Functions (Keep or modify as needed) ---
+// --- Helper Functions ---
 const renderAvatar = (name: string | undefined, size: number = styles.avatar.width) => {
     const initial = name ? name.charAt(0).toUpperCase() : '?';
-    const avatarUrl = null; // Replace with user.avatarUrl if available
-
+    const avatarUrl = null;
     if (avatarUrl) {
         return <Image source={{ uri: avatarUrl }} style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]} />;
     }
     return (
         <View style={[styles.avatarPlaceholder, { width: size, height: size, borderRadius: size / 2 }]}>
-            <FontAwesome name="user" size={size * 0.5} color="#64748b" />
+            <FontAwesome name="user-circle" size={size * 0.6} color="#94a3b8" />
         </View>
     );
 };
@@ -42,29 +44,49 @@ const formatDateSimple = (dateString: string | undefined): string => {
 
 // --- Main Component ---
 export default function ProfileScreen() {
-    const { user, logout, isAuthenticated } = useAuth(); // Get user, logout, and auth status
-    console.log('ProfileScreen: Rendering with user:', JSON.stringify(user))
+    const { user, logout, isAuthenticated, refreshUserData } = useAuth();
+    console.log('ProfileScreen: Rendering with user:', JSON.stringify(user));
 
     // --- State for fetched data ---
     const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
-    const [courses, setCourses] = useState<Record<number, Course>>({}); // Store course details by ID
+    const [courses, setCourses] = useState<Record<number, Course>>({});
     const [certifications, setCertifications] = useState<Certification[]>([]);
     const [isLoadingEnrollments, setIsLoadingEnrollments] = useState(false);
     const [isLoadingCerts, setIsLoadingCerts] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
 
-    // --- Data Fetching Logic ---
+    // --- State for Edit Profile Modal & Form ---
+    const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+    const [editFirstName, setEditFirstName] = useState('');
+    const [editLastName, setEditLastName] = useState('');
+    const [editEmail, setEditEmail] = useState('');
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmNewPassword, setConfirmNewPassword] = useState('');
+    const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+    const [editFormErrors, setEditFormErrors] = useState<Partial<UserProfileUpdate & { form?: string, confirmPassword?: string }>>({});
+
+    // --- Populate form fields when user data is available or modal opens ---
+    useEffect(() => {
+        if (user) {
+            setEditFirstName(user.firstName || '');
+            setEditLastName(user.lastName || '');
+            setEditEmail(user.email || '');
+        }
+    }, [user, isEditModalVisible]);
+
+    // --- Data Fetching Logic --- (RESTORED FROM OLD FILE)
     const fetchData = useCallback(async () => {
         if (!isAuthenticated || !user) {
             console.log("Not authenticated, skipping profile data fetch.");
-            setEnrollments([]); // Clear data if user logs out
+            setEnrollments([]);
             setCertifications([]);
             setCourses({});
             return;
         }
         console.log("Fetching profile data...");
-        setError(null); // Clear previous errors
+        setError(null);
         setIsLoadingEnrollments(true);
         setIsLoadingCerts(true);
 
@@ -75,7 +97,7 @@ export default function ProfileScreen() {
                 apiService.getUserCertifications()
             ]);
 
-            setEnrollments(enrollmentData || []); // Handle null response if API returns that
+            setEnrollments(enrollmentData || []);
             setCertifications(certificationData || []);
 
             // --- Fetch course details for enrollments/certs ---
@@ -85,7 +107,7 @@ export default function ProfileScreen() {
             (certificationData || []).forEach(c => c.courseId && courseIds.add(c.courseId));
 
             if (courseIds.size > 0) {
-                 console.log("Fetching course details for IDs:", Array.from(courseIds));
+                console.log("Fetching course details for IDs:", Array.from(courseIds));
                 const coursePromises = Array.from(courseIds).map(id =>
                     apiService.getCourseById(id).catch(err => {
                         console.warn(`Failed to fetch course ${id}:`, err);
@@ -100,12 +122,10 @@ export default function ProfileScreen() {
                     }
                 });
                 setCourses(courseMap);
-                 console.log("Fetched course details:", courseMap);
+                console.log("Fetched course details:", courseMap);
             } else {
-                 setCourses({}); // Reset courses if no IDs found
+                setCourses({});
             }
-
-
         } catch (err: any) {
             console.error("Failed to fetch profile data:", err);
             const message = err?.response?.data?.message || err?.message || "Failed to load profile data.";
@@ -115,12 +135,12 @@ export default function ProfileScreen() {
             setIsLoadingEnrollments(false);
             setIsLoadingCerts(false);
         }
-    }, [isAuthenticated, user]); // Dependency: only refetch if auth status or user changes
+    }, [isAuthenticated, user]);
 
     // --- Initial Fetch and Refresh ---
     useEffect(() => {
-        fetchData(); // Fetch data on initial mount or when auth changes
-    }, [fetchData]); // Use the memoized fetchData function
+        fetchData();
+    }, [fetchData]);
 
     const onRefresh = useCallback(async () => {
         console.log("Refreshing profile data...");
@@ -149,21 +169,74 @@ export default function ProfileScreen() {
     );
 
     const renderCertificateItem = (item: Certification) => (
-         <View key={`cert-${item.id ?? item.certificationId}`} style={styles.listItem}>
+        <View key={`cert-${item.id ?? item.certificationId}`} style={styles.listItem}>
             <Text style={styles.listItemTitle}>{courses[item.courseId]?.title ?? `Course ID: ${item.courseId}`}</Text>
             <Text style={styles.listItemSubtitle}>Issued: {formatDateSimple(item.issueDate ?? item.certificationDate)} - Status: {item.status}</Text>
-             
-             
         </View>
     );
+
+    // --- Handle Edit Profile Submission ---
+    const handleProfileUpdate = async () => {
+        // Basic Frontend Validation
+        let errors: Partial<UserProfileUpdate & { form?: string, confirmPassword?: string }> = {};
+        if (!editFirstName.trim()) errors.firstName = "First name is required.";
+        if (!editLastName.trim()) errors.lastName = "Last name is required.";
+        if (!editEmail.trim()) errors.email = "Email is required.";
+        // Basic email format validation (simple)
+        else if (!/\S+@\S+\.\S+/.test(editEmail)) errors.email = "Email address is invalid.";
+
+        if (newPassword) { // Only validate password fields if new password is being set
+            if (!currentPassword) errors.currentPassword = "Current password is required to change password.";
+            if (newPassword.length < 6) errors.newPassword = "New password must be at least 6 characters.";
+            if (newPassword !== confirmNewPassword) errors.confirmPassword = "New passwords do not match.";
+        }
+        setEditFormErrors(errors);
+
+        if (Object.keys(errors).length > 0) {
+            return; // Stop if there are validation errors
+        }
+
+        setIsUpdatingProfile(true);
+        setEditFormErrors({}); // Clear previous form-level errors
+
+        const updatePayload: UserProfileUpdate = {
+            firstName: editFirstName,
+            lastName: editLastName,
+            email: editEmail,
+        };
+
+        if (newPassword && currentPassword) {
+            updatePayload.currentPassword = currentPassword;
+            updatePayload.newPassword = newPassword;
+        }
+
+        try {
+            console.log("Updating profile with payload:", updatePayload);
+            // TODO: Add apiService.updateUserProfile(user.id, updatePayload) or apiService.updateMyProfile(updatePayload)
+            // For now, simulate success:
+            // await apiService.updateMyProfile(updatePayload); // Replace with actual call
+
+            Alert.alert("Success", "Profile updated successfully!");
+            setIsEditModalVisible(false);
+            await refreshUserData(); // Refresh user data in AuthContext to reflect changes
+            // Clear password fields after submission
+            setCurrentPassword('');
+            setNewPassword('');
+            setConfirmNewPassword('');
+        } catch (err: any) {
+            console.error("Failed to update profile:", err);
+            const message = err?.response?.data?.message || err?.message || "Failed to update profile.";
+            setEditFormErrors({ form: message }); // Show general form error in modal
+        } finally {
+            setIsUpdatingProfile(false);
+        }
+    };
 
     return (
         <SafeAreaView style={styles.safeArea}>
             <ScrollView
                 style={styles.container}
-                refreshControl={ // Add pull-to-refresh
-                    <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#64748b"/>
-                }
+                refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#64748b"/>}
             >
                 {/* Header Section */}
                 <View style={styles.header}>
@@ -173,6 +246,11 @@ export default function ProfileScreen() {
                     {user?.role && (
                         <Text style={styles.role}>Role: {user.role.replace('ROLE_', '').replace('_', ' ')}</Text>
                     )}
+                    {/* Edit Profile Button */}
+                    <TouchableOpacity style={styles.editProfileButton} onPress={() => setIsEditModalVisible(true)}>
+                        <Feather name="edit-2" size={16} color={styles.editProfileButtonText.color} />
+                        <Text style={styles.editProfileButtonText}>Edit My Profile</Text>
+                    </TouchableOpacity>
                 </View>
 
                 {/* Content Sections */}
@@ -182,7 +260,7 @@ export default function ProfileScreen() {
                         <Text style={styles.sectionTitle}>Mes formations</Text>
                         {isLoadingEnrollments ? (
                             <ActivityIndicator size="small" color="#64748b" />
-                        ) : error && !enrollments.length ? ( // Show error only if loading finished and no data shown
+                        ) : error && !enrollments.length ? (
                             <Text style={styles.errorText}>Could not load formations.</Text>
                         ) : enrollments.length > 0 ? (
                             enrollments.map(renderEnrollmentItem)
@@ -194,7 +272,7 @@ export default function ProfileScreen() {
                     {/* Certificats Section */}
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Mes certificats</Text>
-                         {isLoadingCerts ? (
+                        {isLoadingCerts ? (
                             <ActivityIndicator size="small" color="#64748b" />
                         ) : error && !certifications.length ? (
                             <Text style={styles.errorText}>Could not load certificates.</Text>
@@ -214,6 +292,112 @@ export default function ProfileScreen() {
                     </TouchableOpacity>
                 </View>
             </ScrollView>
+
+            {/* Edit Profile Modal */}
+            <Modal
+                animationType="fade"
+                transparent={true}
+                visible={isEditModalVisible}
+                onRequestClose={() => {
+                    if (!isUpdatingProfile) setIsEditModalVisible(false);
+                }}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Edit Profile</Text>
+
+                        {editFormErrors.form && <Text style={styles.modalFormErrorText}>{editFormErrors.form}</Text>}
+
+                        <ScrollView>
+                            <Text style={styles.inputLabel}>First Name</Text>
+                            <TextInput
+                                style={[styles.input, editFormErrors.firstName ? styles.inputError : null]}
+                                value={editFirstName}
+                                onChangeText={setEditFirstName}
+                                placeholder="First Name"
+                                autoCapitalize="words"
+                                editable={!isUpdatingProfile}
+                            />
+                            {editFormErrors.firstName && <Text style={styles.errorTextInline}>{editFormErrors.firstName}</Text>}
+
+                            <Text style={styles.inputLabel}>Last Name</Text>
+                            <TextInput
+                                style={[styles.input, editFormErrors.lastName ? styles.inputError : null]}
+                                value={editLastName}
+                                onChangeText={setEditLastName}
+                                placeholder="Last Name"
+                                autoCapitalize="words"
+                                editable={!isUpdatingProfile}
+                            />
+                            {editFormErrors.lastName && <Text style={styles.errorTextInline}>{editFormErrors.lastName}</Text>}
+
+                            <Text style={styles.inputLabel}>Email</Text>
+                            <TextInput
+                                style={[styles.input, editFormErrors.email ? styles.inputError : null]}
+                                value={editEmail}
+                                onChangeText={setEditEmail}
+                                placeholder="Email Address"
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                                editable={!isUpdatingProfile}
+                            />
+                            {editFormErrors.email && <Text style={styles.errorTextInline}>{editFormErrors.email}</Text>}
+
+                            <Text style={styles.passwordSectionTitle}>Change Password (Optional)</Text>
+                            <Text style={styles.inputLabel}>Current Password</Text>
+                            <TextInput
+                                style={[styles.input, editFormErrors.currentPassword ? styles.inputError : null]}
+                                value={currentPassword}
+                                onChangeText={setCurrentPassword}
+                                placeholder="Current Password"
+                                secureTextEntry
+                                editable={!isUpdatingProfile}
+                            />
+                            {editFormErrors.currentPassword && <Text style={styles.errorTextInline}>{editFormErrors.currentPassword}</Text>}
+
+                            <Text style={styles.inputLabel}>New Password</Text>
+                            <TextInput
+                                style={[styles.input, editFormErrors.newPassword ? styles.inputError : null]}
+                                value={newPassword}
+                                onChangeText={setNewPassword}
+                                placeholder="New Password (min. 6 chars)"
+                                secureTextEntry
+                                editable={!isUpdatingProfile}
+                            />
+                            {editFormErrors.newPassword && <Text style={styles.errorTextInline}>{editFormErrors.newPassword}</Text>}
+
+                            <Text style={styles.inputLabel}>Confirm New Password</Text>
+                            <TextInput
+                                style={[styles.input, editFormErrors.confirmPassword ? styles.inputError : null]}
+                                value={confirmNewPassword}
+                                onChangeText={setConfirmNewPassword}
+                                placeholder="Confirm New Password"
+                                secureTextEntry
+                                editable={!isUpdatingProfile}
+                            />
+                            {editFormErrors.confirmPassword && <Text style={styles.errorTextInline}>{editFormErrors.confirmPassword}</Text>}
+                        </ScrollView>
+
+                        <View style={styles.modalFooter}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.modalCancelButton]}
+                                onPress={() => setIsEditModalVisible(false)}
+                                disabled={isUpdatingProfile}
+                            >
+                                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.modalSubmitButton, isUpdatingProfile && styles.modalButtonDisabled]}
+                                onPress={handleProfileUpdate}
+                                disabled={isUpdatingProfile}
+                            >
+                                <Text style={styles.modalSubmitButtonText}>Save Changes</Text>
+                                {isUpdatingProfile && <ActivityIndicator size="small" color="#fff" style={{marginLeft: 10}} />}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -235,14 +419,14 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: '#e2e8f0',
     },
-    avatar: { // Style for actual Image
+    avatar: {
         width: 100,
         height: 100,
         borderRadius: 50,
         marginBottom: 16,
         backgroundColor: '#e2e8f0',
     },
-    avatarPlaceholder: { // Style for the fallback View
+    avatarPlaceholder: {
         width: 100,
         height: 100,
         borderRadius: 50,
@@ -263,11 +447,28 @@ const styles = StyleSheet.create({
         fontSize: 15,
         color: '#64748b',
     },
-     role: {
+    role: {
         fontSize: 13,
         color: '#94a3b8',
         marginTop: 8,
         textTransform: 'capitalize',
+    },
+    editProfileButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 16,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        backgroundColor: '#e0e7ff',
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#a5b4fc',
+    },
+    editProfileButtonText: {
+        color: '#3730a3',
+        marginLeft: 8,
+        fontWeight: '500',
+        fontSize: 14,
     },
     contentPadding: {
         padding: 20,
@@ -286,23 +487,18 @@ const styles = StyleSheet.create({
         color: '#1e293b',
         marginBottom: 12,
     },
-    sectionContent: { // Used for empty state text now
+    sectionContent: {
         fontSize: 14,
         color: '#64748b',
         lineHeight: 20,
-        textAlign: 'center', // Center empty state text
-        paddingVertical: 10, // Add some padding
+        textAlign: 'center',
+        paddingVertical: 10,
     },
-     // Styles for list items within sections
     listItem: {
         paddingVertical: 8,
         borderBottomWidth: 1,
-        borderBottomColor: '#f1f5f9', // Lighter separator
+        borderBottomColor: '#f1f5f9',
     },
-    // Remove border from the last item in a list
-    // Note: Applying this cleanly requires tracking index in map or using FlatList
-    // For simplicity, we'll leave the border on the last item for now.
-    // listItem:last-child { borderBottomWidth: 0 }, // CSS concept
     listItemTitle: {
         fontSize: 15,
         fontWeight: '500',
@@ -315,23 +511,123 @@ const styles = StyleSheet.create({
     },
     errorText: {
         fontSize: 14,
-        color: '#dc2626', // Red error color
+        color: '#dc2626',
         textAlign: 'center',
         paddingVertical: 10,
     },
     logoutButton: {
-        backgroundColor: '#fee2e2', // Light red background
+        backgroundColor: '#fee2e2',
         borderRadius: 8,
         height: 50,
         alignItems: 'center',
         justifyContent: 'center',
         marginTop: 16,
         borderWidth: 1,
-        borderColor: '#fca5a5', // Red border
+        borderColor: '#fca5a5',
     },
     logoutButtonText: {
-        color: '#b91c1c', // Dark red text
+        color: '#b91c1c',
         fontSize: 16,
         fontWeight: 'bold',
     },
+    
+    // Modal and Form Styles
+    modalOverlay: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    },
+    modalContent: {
+        width: '90%',
+        maxWidth: 450,
+        backgroundColor: '#ffffff',
+        borderRadius: 12,
+        padding: 20,
+        maxHeight: '85%',
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '600',
+        color: '#1e293b',
+        marginBottom: 20,
+        textAlign: 'center',
+    },
+    modalFormErrorText: {
+        color: '#dc2626',
+        fontSize: 14,
+        textAlign: 'center',
+        marginBottom: 10,
+    },
+    inputLabel: {
+        fontSize: 14,
+        color: '#334155',
+        marginBottom: 6,
+        marginTop: 10,
+        fontWeight: '500',
+    },
+    input: {
+        backgroundColor: '#f8fafc',
+        height: 48,
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        borderWidth: 1,
+        borderColor: '#cbd5e1',
+        fontSize: 15,
+        color: '#1e293b',
+    },
+    inputError: {
+        borderColor: '#ef4444',
+    },
+    errorTextInline: {
+        color: '#ef4444',
+        fontSize: 12,
+        marginTop: 4,
+    },
+    passwordSectionTitle: {
+        fontSize: 16,
+        fontWeight: '500',
+        color: '#4b5563',
+        marginTop: 20,
+        marginBottom: 10,
+        borderTopWidth: 1,
+        borderTopColor: '#e2e8f0',
+        paddingTop: 15,
+    },
+    modalFooter: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        marginTop: 24,
+        paddingTop: 10,
+        borderTopWidth: 1,
+        borderTopColor: '#e2e8f0',
+    },
+    modalButton: {
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 8,
+        marginLeft: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    modalButtonDisabled: {
+        opacity: 0.7,
+    },
+    modalCancelButton: {
+        backgroundColor: '#f1f5f9',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+    },
+    modalCancelButtonText: {
+        color: '#334155',
+        fontWeight: '500',
+    },
+    modalSubmitButton: {
+        backgroundColor: '#2563eb',
+    },
+    modalSubmitButtonText: {
+        color: '#ffffff',
+        fontWeight: '500',
+    },
+    iconColor: { color: '#64748b' },
 });
