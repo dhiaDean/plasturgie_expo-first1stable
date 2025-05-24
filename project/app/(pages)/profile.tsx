@@ -19,6 +19,7 @@ import { apiService } from '../services/api.service';
 import { Enrollment, Certification, Course, UserProfileUpdate } from '../services/api.types';
 import { FontAwesome, Feather, MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { AlignCenter } from 'lucide-react-native';
 
 // --- Helper Functions ---
 const renderAvatar = (name: string | undefined, avatarUrl: string | null, size: number = styles.avatar.width, onPress?: () => void) => {
@@ -37,7 +38,7 @@ const renderAvatar = (name: string | undefined, avatarUrl: string | null, size: 
             <TouchableOpacity onPress={onPress} style={styles.avatarContainer}>
                 {content}
                 <View style={styles.editAvatarOverlay}>
-                    <Feather name="camera" size={24} color="#ffffff" />
+                    <Feather name="edit-3" size={24} color="#ffffff" />
                 </View>
             </TouchableOpacity>
         );
@@ -411,11 +412,7 @@ export default function ProfileScreen() {
                     {user?.role && (
                         <Text style={styles.role}>Role: {user.role.replace('ROLE_', '').replace('_', ' ')}</Text>
                     )}
-                    {/* Edit Profile Button */}
-                    <TouchableOpacity style={styles.editProfileButton} onPress={() => setIsEditModalVisible(true)}>
-                        <Feather name="edit-2" size={16} color={styles.editProfileButtonText.color} />
-                        <Text style={styles.editProfileButtonText}>Edit My Profile</Text>
-                    </TouchableOpacity>
+                    
                 </View>
 
                 {/* Content Sections */}
@@ -447,7 +444,11 @@ export default function ProfileScreen() {
                             <Text style={styles.sectionContent}>Aucun certificat obtenu pour le moment.</Text>
                         )}
                     </View>
-
+                    {/* Edit Profile Button */}
+                    <TouchableOpacity style={styles.editProfileButton} onPress={() => setIsEditModalVisible(true)}>
+                        <Feather name="edit-2" size={16} color={styles.editProfileButtonText.color} />
+                        <Text style={styles.editProfileButtonText}>Edit My Profile</Text>
+                    </TouchableOpacity>
                     {/* Logout Button */}
                     <TouchableOpacity
                         style={styles.logoutButton}
@@ -686,6 +687,7 @@ const styles = StyleSheet.create({
     },
     editProfileButton: {
         flexDirection: 'row',
+        justifyContent: 'center',
         alignItems: 'center',
         marginTop: 16,
         paddingVertical: 8,
@@ -748,8 +750,8 @@ const styles = StyleSheet.create({
     },
     logoutButton: {
         backgroundColor: '#fee2e2',
-        borderRadius: 8,
-        height: 50,
+        borderRadius: 20,
+        height: 47,
         alignItems: 'center',
         justifyContent: 'center',
         marginTop: 16,
@@ -761,6 +763,8 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: 'bold',
     },
+    
+    
     
     // Modal and Form Styles
     modalOverlay: {

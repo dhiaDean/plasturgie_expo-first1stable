@@ -1,370 +1,407 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { Feather } from '@expo/vector-icons'; // Using Feather for the X icon
-import Header from '@/components/Header';
-// Define a type for the enrollment data
-type EnrollmentType = {
-  id: number;
-  trainingTitle: string;
-  enrollmentDate: string; // Keep as string for simplicity, parse when needed
-  status: "Active" | "Completed" | "Pending";
-  tutorName: string;
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+    View,
+    Text,
+    StyleSheet,
+    TouchableOpacity, // Keep if you add actions to items
+    ScrollView,
+    useWindowDimensions,
+    Platform,
+    ActivityIndicator,
+    RefreshControl,
+    SafeAreaView,
+    Alert,
+} from 'react-native';
+import { ClipboardList, BookOpen } from 'lucide-react-native'; // Using ClipboardList as primary icon
+import { useRouter } from 'expo-router';
+
+import { useAuth } from '@/contexts/AuthContext';
+import { apiService } from '../services/api.service'; // Adjust path if necessary
+import { Enrollment, Course } from '../services/api.types'; // Adjust path if necessary
+
+// Helper to format date
+const formatDateSimple = (dateString: string | undefined): string => {
+    if (!dateString) return 'N/A';
+    try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return 'Invalid Date';
+        return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+    } catch (e) { return 'Error'; }
 };
 
-// Mock data (would come from API/state management)
-const enrollmentsData: EnrollmentType[] = [
-    {
-      id: 1,
-      trainingTitle: "Introduction to Injection Molding",
-      enrollmentDate: "2025-03-20",
-      status: "Active",
-      tutorName: "Dr. Albert Johnson",
-    },
-    {
-      id: 2,
-      trainingTitle: "Plastic Recycling Methods",
-      enrollmentDate: "2025-03-10",
-      status: "Completed",
-      tutorName: "Sarah Williams",
-    },
-    {
-      id: 3,
-      trainingTitle: "Advanced Extrusion Techniques",
-      enrollmentDate: "2025-03-05",
-      status: "Pending",
-      tutorName: "Michael Chen",
-    },
-    // Add more or remove to test empty state
-];
+// --- Main Component ---
+export default function EnrollmentsScreen() {
+  const router = useRouter();
+  const { width } = useWindowDimensions(); // For potential responsive layout
+  const { user, isAuthenticated, token } = useAuth();
 
-// --- Reusable Components (can be moved to separate files) ---
+  // --- State for fetched data ---
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [courses, setCourses] = useState<Record<number, Course>>({}); // Store course details by ID
+  const [isLoading, setIsLoading] = useState(true); // Initial loading state
+  const [error, setError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-interface BadgeProps {
-  status: EnrollmentType['status'];
-}
+  // --- Data Fetching Logic ---
+  const fetchData = useCallback(async () => {
+    if (!isAuthenticated || !user || !token) {
+        console.log("EnrollmentsScreen: Not authenticated, skipping data fetch.");
+        setEnrollments([]);
+        setCourses({});
+        setIsLoading(false);
+        setIsRefreshing(false);
+        return;
+    }
+    console.log("EnrollmentsScreen: Fetching enrollments for user:", user.id);
+    setError(null);
+    if (!isRefreshing) setIsLoading(true);
 
-// Reusing the StatusBadge concept from the Courses example
-const StatusBadge: React.FC<BadgeProps> = ({ status }) => {
-  let style = styles.badgeBase;
-  let textStyle = styles.badgeTextBase;
+    try {
+        apiService.setToken(token); // Ensure service has current token
+        const enrollmentData = await apiService.getUserEnrollments();
+        setEnrollments(enrollmentData || []);
 
-  switch (status) {
-    case "Completed":
-      style = { ...style, ...styles.badgeCompleted };
-      textStyle = { ...textStyle, ...styles.badgeTextCompleted };
-      break;
-    case "Active": // Changed from In Progress to Active
-      style = { ...style, ...styles.badgeActive };
-      textStyle = { ...textStyle, ...styles.badgeTextActive };
-      break;
-    case "Pending": // Changed from Just Started to Pending
-      style = { ...style, ...styles.badgePending };
-      textStyle = { ...textStyle, ...styles.badgeTextPending };
-      break;
+        // --- Fetch course details for enrollments ---
+        const courseIds = new Set<number>();
+        (enrollmentData || []).forEach(e => e.courseId && courseIds.add(e.courseId));
+
+        if (courseIds.size > 0) {
+            console.log("EnrollmentsScreen: Fetching course details for IDs:", Array.from(courseIds));
+            const coursePromises = Array.from(courseIds).map(id =>
+                apiService.getCourseById(id).catch(err => {
+                    console.warn(`EnrollmentsScreen: Failed to fetch course ${id}:`, err.message);
+                    return null;
+                })
+            );
+            const courseResults = await Promise.all(coursePromises);
+            const courseMap: Record<number, Course> = {};
+            courseResults.forEach(course => {
+                if (course?.courseId) courseMap[course.courseId] = course;
+            });
+            setCourses(courseMap);
+            console.log("EnrollmentsScreen: Fetched course details count:", Object.keys(courseMap).length);
+        } else {
+            setCourses({});
+        }
+    } catch (err: any) {
+        console.error("EnrollmentsScreen: Failed to fetch data:", err);
+        const message = err?.response?.data?.message || err?.message || "Failed to load enrollments.";
+        setError(message);
+    } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
+    }
+  }, [isAuthenticated, user, token, isRefreshing]); // Dependencies
+
+  // --- Initial Fetch & Refresh Control ---
+  useEffect(() => {
+    if (isAuthenticated && user && token) {
+        fetchData();
+    } else {
+        setEnrollments([]);
+        setCourses({});
+        if (!isAuthenticated && !isLoading) setIsLoading(false);
+    }
+  }, [fetchData, isAuthenticated, user, token, isLoading]);
+
+  const onRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    await fetchData();
+  }, [fetchData]);
+
+  // Calculate number of columns (optional for this list view, but kept for consistency)
+  const getColumnCount = () => {
+    if (width < 768) return 1; // Mobile/Small Tablet - 1 column
+    return 2; // Larger Tablet/Web - 2 columns for cards (if using card layout)
+  };
+  const columnCount = getColumnCount();
+
+  // --- Render Logic ---
+  if (isLoading && enrollments.length === 0) {
+    return (
+        <SafeAreaView style={[styles.container, styles.centerContainer]}>
+            <ActivityIndicator size="large" color={styles.colorAccent.color} />
+            <Text style={styles.loadingText}>Loading Enrollments...</Text>
+        </SafeAreaView>
+    );
   }
 
-  return (
-    <View style={style}>
-      <Text style={textStyle}>{status}</Text>
-    </View>
-  );
-};
+  // --- Render Enrollment Item ---
+  const renderEnrollmentCard = (enrollment: Enrollment) => {
+    const courseTitle = courses[enrollment.courseId]?.title || "Course details unavailable";
+    const courseCategory = courses[enrollment.courseId]?.category || "N/A";
 
+    return (
+        <View
+            key={enrollment.id ?? enrollment.enrollmentId}
+            style={[
+                styles.enrollmentCard,
+                // Example for multi-column layout if desired for web/tablet:
+                // { width: columnCount === 1 ? '100%' : `${Math.floor(100 / columnCount) - (columnCount > 1 ? 2 : 0)}%` }
+            ]}
+        >
+            <View style={styles.cardHeader}>
+                <BookOpen size={20} color={styles.colorAccent.color} />
+                <Text style={styles.cardTitle} numberOfLines={2}>{courseTitle}</Text>
+            </View>
 
-// --- Main Enrollments Screen Component ---
-
-const EnrollmentsScreen = () => {
-  const navigation = useNavigation<any>(); // Use specific type if available
-  // In a real app, you'd likely manage this state with useState/useEffect or state management library
-  const [enrollments, setEnrollments] = React.useState(enrollmentsData);
-
-  const handleCancelEnrollment = (enrollmentId: number) => {
-    // Find the enrollment to potentially update UI or show confirmation
-    const enrollmentToCancel = enrollments.find(e => e.id === enrollmentId);
-    if (!enrollmentToCancel) return;
-
-    Alert.alert(
-      "Confirm Cancellation",
-      `Are you sure you want to cancel your enrollment in "${enrollmentToCancel.trainingTitle}"?`,
-      [
-        { text: "Keep Enrollment", style: "cancel" },
-        {
-          text: "Yes, Cancel",
-          onPress: () => {
-            console.log(`Canceling enrollment: ${enrollmentId}`);
-            // --- Simulated API Call & State Update ---
-            // In a real app: call API endpoint to cancel enrollment.
-            // On success, update the local state:
-            // Option 1: Refetch enrollments from the API
-            // Option 2: Filter out the canceled enrollment locally (example below)
-            setEnrollments(prevEnrollments =>
-              prevEnrollments.filter(e => e.id !== enrollmentId)
-            );
-            // Or update status to "Cancelled" if your backend supports it:
-            // setEnrollments(prevEnrollments =>
-            //   prevEnrollments.map(e =>
-            //     e.id === enrollmentId ? { ...e, status: "Cancelled" } : e
-            //   )
-            // );
-            // -----------------------------------------
-          },
-          style: "destructive",
-        },
-      ]
+            <View style={styles.cardDetails}>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Category:</Text>
+                  <Text style={styles.detailValue}>{courseCategory}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Enrollment Date:</Text>
+                  <Text style={styles.detailValue}>{formatDateSimple(enrollment.enrollmentDate)}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Status:</Text>
+                  <Text style={[styles.detailValue, getStatusStyle(enrollment.status)]}>{enrollment.status}</Text>
+                </View>
+                {enrollment.completionDate && (
+                    <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Completion Date:</Text>
+                        <Text style={styles.detailValue}>{formatDateSimple(enrollment.completionDate)}</Text>
+                    </View>
+                )}
+            </View>
+            {/* Optional: Add action button e.g., "View Course" */}
+            {/*
+            <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => router.push(`/(pages)/cours/${enrollment.courseId}` as any)}
+            >
+                <Text style={styles.actionButtonText}>View Course</Text>
+            </TouchableOpacity>
+            */}
+        </View>
     );
   };
 
-  const formatDate = (dateString: string) => {
-    try {
-        // Basic formatting, consider a library like date-fns for robustness
-        return new Date(dateString).toLocaleDateString(undefined, { // Use user's locale
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-        });
-    } catch (e) {
-        return dateString; // Fallback if date is invalid
-    }
-  };
 
   return (
-    <ScrollView style={styles.screenContainer} contentContainerStyle={styles.scrollContentContainer}>
-      
+    <SafeAreaView style={styles.container}>
       <Text style={styles.pageTitle}>My Enrollments</Text>
 
-      {enrollments.length > 0 ? (
-        <View style={styles.tableContainer}>
-          {/* Table Header */}
-          <View style={[styles.tableRow, styles.tableHeader]}>
-            <Text style={[styles.tableHeaderCell, styles.columnTraining]}>Training</Text>
-            <Text style={[styles.tableHeaderCell, styles.columnDate]}>Enrolled</Text>
-            <Text style={[styles.tableHeaderCell, styles.columnStatus]}>Status</Text>
-            <Text style={[styles.tableHeaderCell, styles.columnTutor]}>Tutor</Text>
-            <Text style={[styles.tableHeaderCell, styles.columnActions, { textAlign: 'right' }]}>Actions</Text>
-          </View>
-
-          {/* Table Body */}
-          {enrollments.map((enrollment, index) => (
-            <View key={enrollment.id} style={[styles.tableRow, index % 2 !== 0 ? styles.tableRowAlt : null]}>
-              <Text style={[styles.tableCell, styles.columnTraining, styles.cellTrainingTitle]}>{enrollment.trainingTitle}</Text>
-              <Text style={[styles.tableCell, styles.columnDate]}>{formatDate(enrollment.enrollmentDate)}</Text>
-              <View style={[styles.tableCell, styles.columnStatus]}>
-                <StatusBadge status={enrollment.status} />
-              </View>
-              <Text style={[styles.tableCell, styles.columnTutor]}>{enrollment.tutorName}</Text>
-              <View style={[styles.tableCell, styles.columnActions, styles.actionsCell]}>
-                {enrollment.status !== "Completed" && (
-                  <TouchableOpacity
-                    style={styles.cancelButton}
-                    onPress={() => handleCancelEnrollment(enrollment.id)}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} // Increases tap area
-                  >
-                    <Feather name="x" size={16} color="#ef4444" style={styles.cancelIcon} />
-                    <Text style={styles.cancelButtonText}>Cancel</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+            <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={styles.colorSecondaryText.color} />
+        }
+      >
+        {error && !isLoading && (
+            <View style={styles.errorBox}>
+                <Text style={styles.errorTextMsg}>Error: {error}</Text>
+                <TouchableOpacity onPress={onRefresh} style={styles.retryButton}>
+                    <Text style={styles.retryButtonText}>Retry</Text>
+                </TouchableOpacity>
             </View>
-          ))}
-          <Text style={styles.tableCaption}>List of your current and past enrollments</Text>
-        </View>
-      ) : (
-        // Empty State
-        <View style={styles.emptyStateContainer}>
-          <Feather name="list" size={60} color="#9ca3af" />
-          <Text style={styles.emptyStateTitle}>No Enrollments Found</Text>
-          <Text style={styles.emptyStateSubtitle}>
-            You haven't enrolled in any training courses yet.
-          </Text>
-          <TouchableOpacity
-            style={styles.browseButton}
-            onPress={() => navigation.navigate('Catalogue')} // Navigate to Catalogue screen
-          >
-            <Text style={styles.browseButtonText}>Browse Trainings</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </ScrollView>
+        )}
+
+        {!isLoading && !error && enrollments.length === 0 && (
+          <View style={styles.emptyState}>
+            <ClipboardList size={64} color={styles.colorMutedText.color} />
+            <Text style={styles.emptyStateTitle}>No Enrollments Found</Text>
+            <Text style={styles.emptyStateDescription}>
+              You are not currently enrolled in any courses. Explore our catalog to find your next learning opportunity!
+            </Text>
+            <TouchableOpacity
+              style={styles.browseButton}
+              onPress={() => router.push('/(pages)/cours' as any)} // Navigate to general courses page
+            >
+              <Text style={styles.browseButtonText}>Browse Courses</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {!error && enrollments.length > 0 && (
+          <View style={[
+                styles.enrollmentsList,
+                // Apply grid styles if columnCount > 1
+                // columnCount > 1 && { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between'}
+            ]}>
+            {enrollments.map(renderEnrollmentCard)}
+          </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
+}
+
+// Helper function for status text color
+const getStatusStyle = (status: Enrollment['status']) => {
+    switch(status) {
+        case 'ACTIVE': return { color: '#16a34a' }; // Green
+        case 'PENDING': return { color: '#ca8a04' }; // Yellow/Amber
+        case 'COMPLETED': return { color: '#1e40af' }; // Blue
+        case 'CANCELLED': return { color: '#7f1d1d'}; // Darker Red
+        default: return {};
+    }
 };
 
 // --- Styles ---
 const styles = StyleSheet.create({
-  screenContainer: {
-    flex: 1,
-    backgroundColor: '#f8fafc', // Light gray background
-  },
-  scrollContentContainer: {
-      padding: 16,
-      paddingBottom: 40, // Ensure space at the bottom
-  },
-  pageTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    color: '#1f2937', // Dark gray
-  },
-  // Table Styles
-  tableContainer: {
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 8,
-    backgroundColor: '#ffffff', // White background for table area
-    overflow: 'hidden', // Clip content to rounded border
-  },
-  tableRow: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    alignItems: 'center', // Vertically align items in the row
-    paddingVertical: 12, // Add vertical padding to rows
-    paddingHorizontal: 10, // Horizontal padding for the row content
-  },
-   tableRowAlt: { // Optional alternating row color
-    backgroundColor: '#f9fafb',
-   },
-  tableHeader: {
-    backgroundColor: '#f9fafb', // Slightly different background for header
-    borderBottomWidth: 2, // Thicker border below header
-    paddingVertical: 10, // Slightly less padding for header
-  },
-  tableCell: {
-    fontSize: 14,
-    color: '#374151', // Default cell text color
-    paddingHorizontal: 4, // Horizontal padding within cells
-  },
-  tableHeaderCell: {
-    fontSize: 13,
-    fontWeight: '600', // Bolder header text
-    color: '#4b5563', // Header text color
-    textTransform: 'uppercase', // Optional: Uppercase headers
-    paddingHorizontal: 4, // Horizontal padding within cells
-  },
-  // Column Widths using Flex (adjust ratios as needed)
-  columnTraining: {
-      flex: 3, // Takes more space
-      minWidth: 120, // Ensure minimum width
-  },
-  columnDate: {
-      flex: 2,
-      minWidth: 80,
-  },
-  columnStatus: {
-      flex: 1.5,
-      minWidth: 70,
-      alignItems: 'flex-start', // Align badge to the start
-  },
-  columnTutor: {
-      flex: 2,
-      minWidth: 100,
-  },
-  columnActions: {
-      flex: 1.5,
-      minWidth: 80,
-      alignItems: 'flex-end', // Align actions to the right
-  },
-  cellTrainingTitle: {
-    fontWeight: '500', // Make training title slightly bolder
-    color: '#111827',
-  },
-  actionsCell: {
-      justifyContent: 'flex-end', // Push content to the right
-      flexDirection: 'row', // Ensure button elements align horizontally if needed
-  },
-  cancelButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    // Add some visual indication if needed, e.g., background on hover/press
-    // For now, keeping it simple like the web 'ghost' button
-  },
-  cancelIcon: {
-    marginRight: 4,
-  },
-  cancelButtonText: {
-    color: '#ef4444', // Red color for cancel text
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  tableCaption: {
-      fontSize: 12,
-      color: '#6b7280',
-      padding: 12,
-      textAlign: 'center',
-      backgroundColor: '#f9fafb',
-  },
-  // Badge Styles (Adjust colors to match web example)
-  badgeBase: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignSelf: 'flex-start', // Make badge only as wide as its content
-  },
-  badgeTextBase: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  badgeCompleted: {
-    backgroundColor: '#dcfce7', // Light green
-    borderColor: '#bbf7d0',
-  },
-  badgeTextCompleted: {
-    color: '#166534', // Dark green text
-  },
-  badgeActive: { // Use blue for Active
-    backgroundColor: '#dbeafe', // Light blue
-    borderColor: '#bfdbfe',
-  },
-  badgeTextActive: {
-    color: '#1e40af', // Dark blue text
-  },
-  badgePending: { // Use yellow for Pending
-    backgroundColor: '#fef9c3', // Light yellow
-    borderColor: '#fef08a',
-  },
-  badgeTextPending: {
-    color: '#854d0e', // Dark yellow/brown text
-  },
-   // Empty State
-  emptyStateContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 40,
-    marginTop: 30,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    backgroundColor: '#fff',
-    minHeight: 250, // Give it some minimum height
-  },
-  emptyStateTitle: {
-    marginTop: 16,
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  emptyStateSubtitle: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  browseButton: {
-    backgroundColor: '#3b82f6', // Blue background (same as primary button in Courses)
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 6,
-  },
-  browseButtonText: {
-    color: '#fff',
-    fontWeight: '500',
-    fontSize: 15,
-  },
-});
+    // Core Colors (reused theme)
+    colorPrimaryText: { color: '#1e293b' },
+    colorSecondaryText: { color: '#64748b' },
+    colorMutedText: { color: '#94a3b8' },
+    colorBackground: { backgroundColor: '#f8fafc' },
+    colorCardBackground: { backgroundColor: '#ffffff' },
+    colorBorder: { borderColor: '#e2e8f0' },
+    colorAccent: { color: '#2563eb' },
+    colorErrorText: { color: '#b91c1c'},
 
-export default EnrollmentsScreen;
+    container: {
+        flex: 1,
+        backgroundColor: '#f8fafc',
+    },
+    centerContainer: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingText: {
+        marginTop: 10,
+        fontSize: 16,
+        color: '#64748b',
+    },
+    pageTitle: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#1e293b',
+        paddingHorizontal: 16,
+        paddingTop: Platform.OS === 'android' ? 20 : 10,
+        paddingBottom: 10,
+        backgroundColor: '#ffffff', // Give title a solid background
+        borderBottomWidth: 1,
+        borderBottomColor: '#e2e8f0',
+    },
+    content: {
+        flex: 1,
+    },
+    scrollContent: {
+        padding: 16,
+    },
+    enrollmentsList: {
+        // Styles for the container of all enrollment cards
+    },
+    enrollmentCard: {
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        padding: 16,
+        marginBottom: 16,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1, },
+        shadowOpacity: 0.08,
+        shadowRadius: 3,
+        elevation: 2,
+    },
+    cardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    cardTitle: {
+        fontSize: 17,
+        fontWeight: '600',
+        color: '#1e293b',
+        marginLeft: 10,
+        flex: 1,
+    },
+    cardDetails: {
+        marginBottom: 8, // Reduced margin if no action button
+    },
+    detailRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 5, // Increased padding
+    },
+    detailLabel: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#64748b',
+    },
+    detailValue: {
+        fontSize: 14,
+        color: '#334155',
+        flexShrink: 1,
+        textAlign: 'right',
+    },
+    actionButton: { // Optional button style
+        backgroundColor: '#e0e7ff',
+        borderRadius: 8,
+        paddingVertical: 10,
+        alignItems: 'center',
+        marginTop: 12,
+        borderWidth: 1,
+        borderColor: '#a5b4fc',
+    },
+    actionButtonText: {
+        color: '#3730a3',
+        fontWeight: '500',
+        fontSize: 14,
+    },
+    emptyState: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 32,
+        marginTop: 30,
+    },
+    emptyStateTitle: {
+        fontSize: 20,
+        fontWeight: '600',
+        color: '#1e293b',
+        marginTop: 20,
+        marginBottom: 10,
+    },
+    emptyStateDescription: {
+        fontSize: 16,
+        color: '#64748b',
+        textAlign: 'center',
+        marginBottom: 24,
+        lineHeight: 22,
+    },
+    browseButton: {
+        backgroundColor: '#2563eb',
+        borderRadius: 8,
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+    },
+    browseButtonText: {
+        color: '#fff',
+        fontWeight: '500',
+        fontSize: 16,
+    },
+    // Error Box Styles
+    errorBox: {
+        backgroundColor: '#fee2e2',
+        padding: 15,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#fca5a5',
+        marginBottom: 20,
+        alignItems: 'center',
+    },
+    errorTextMsg: {
+        fontSize: 14,
+        color: '#b91c1c',
+        textAlign: 'center',
+        marginBottom: 10,
+    },
+    retryButton: {
+        backgroundColor: '#ffffff',
+        paddingVertical: 6,
+        paddingHorizontal: 16,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#fca5a5',
+    },
+    retryButtonText: {
+        color: '#b91c1c',
+        fontWeight: '500',
+    },
+});
